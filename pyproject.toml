@@ -1,0 +1,11 @@
+[project]
+name = "tuyaswitchapi"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "flask-restful>=0.3.10",
+    "flask>=3.1.0",
+    "tinytuya>=1.15.1",
+]
