@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+        <title>Tuya Switches</title>
+        <style>
+            .tuya-button {
+                margin: 10px;
+                min-width: 300px;
+                max-width: 50%;
+                text-align: center;
+                padding: 0.75em;
+                border: 1px solid #ccc;
+                border-radius: 50px;
+                cursor:pointer;
+                /* Other button styles */
+            }
+            
+            .button:hover {
+                background-color: #3e8e41;  
+            }
+            .btn-off {
+                opacity: 0.6;
+                cursor: not-allowed;
+        </style>
+    </head>
+    <body>
+        <div class="w3-container w3-teal w3-center">
+            <h1>{{ title }}</h1>
+        </div>
+        <div class="w3-center w3-row-padding w3-panel">
+            {% for switch in switches %}
+            <button class="tuya-button
+            {% if switch[2] == "offline" %}
+                w3-gray btn-off
+            {% elif switch[2] == True %} 
+                w3-green 
+            {% else %}
+                w3-red 
+            {% endif %}
+            " onclick="toggleSwitch('{{ loop.index }}')">
+                <h1>{{ switch[1] }}</h1>
+                <h3>{{ switch[0] }}</h3>{{ switch[3] }} V
+            </button>
+            {% endfor %}
+        </div>
+        <script>
+            function toggleSwitch(device_id) {
+                window.location.href = "/toggle/" + device_id;
+            }
+        </script>
+    </body>
+</html>
