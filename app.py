@@ -19,56 +19,58 @@ from waitress import serve
 app = Flask(__name__)
 api = Api(app)
 
-"""
-devices = {
-    63:{"name":'YDSw063',
-       "id": "eb6d1c9836fc552104rajh",
-        "key": "at(~_uM*LS)@GASP",
-        "ip" : "192.168.31.147"},
-    36:{"name": "YDSW036",
-        "id": "eb19fc8c00ce8b7e46bjjb",
-        "key": "t&+c^e+wgJd5BbUk",
-        "ip" : "192.168.31.148"},
-    42:{"name": "YDSW042",
-        "id": "eb6e6020d2f1744361pmkz",
-        "key": "sS@0Lk3Pgoo0/Mf)",
-        "ip" : "192.168.31.100"},
-}
-"""
 class On(Resource):
     def get(self, pk):
-        try:
-            switch = tinytuya.OutletDevice(dev_id=devices[pk]['id'],
+        pk = pk.upper()
+        """
+        switch = tinytuya.OutletDevice(dev_id=devices[pk]['id'],
                 address=devices[pk]['ip'],
                 local_key=devices[pk]['key'],
                 version=3.4)
-            print(switch.turn_on())
+        """
+        #print(pk)
+        try:
+            switch = devices[pk]["switch"]
+            switch.turn_on()
         except:
             return "error"
         return f"{devices[pk]['name']} Switch Turned On"
 
 class Off(Resource):
     def get(self, pk):
+        pk = pk.upper()
+        """
         switch = tinytuya.OutletDevice(dev_id=devices[pk]['id'],
                 address=devices[pk]['ip'],
                 local_key=devices[pk]['key'],
                 version=3.4)
-        switch.turn_off()
+        """
+        try:
+            switch = devices[pk]["switch"]
+            switch.turn_off()
+        except:
+            return "error"
         return f"{devices[pk]['name']} Switch Turned Off"
 
 class Status(Resource):
     def get(self, pk):
-        print(devices[pk]['name'])
+        pk = pk.upper()
+        #print(devices[pk]['name'])
+        """
         switch = tinytuya.OutletDevice(dev_id=devices[pk]['id'],
                 address=devices[pk]['ip'],
                 local_key=devices[pk]['key'],
                 version=3.4)
-        #switch.turn_off()
-        if switch.status()['dps']['1']:
-            status = "On"
-        else:
-            status = "Off"
-        #print("Switch Turned off")
+        """
+        try:
+            switch = devices[pk]["switch"]
+            if switch.status()['dps']['1']:
+                status = "On"
+            else:
+                status = "Off"
+            #print("Switch Turned off")
+        except:
+            return "error"
         return f"{devices[pk]['name']} Status: {status}"
 
 #api.add_resource(Items, '/')
@@ -79,37 +81,41 @@ api.add_resource(Status, '/status/<pk>')
 @app.route("/")
 def index():
     switchInfo = []
-    i = 0
-    print(switches[0])
     for pk in devices:
+        #print(devices[pk]["switch"])
         try:
             #print(pk)
-            if switches[0] == None:
+            switch = devices[pk]["switch"]
+            if switch == None:
                 switchInfo.append([devices[pk]["name"], pk, "offline", 0])
             else:
-                data = switches[i].status()
+                data = switch.status()
                 #print(data)
                 #print(data)
                 switch_state = data["dps"]["1"]
                 voltage = data["dps"]["20"]
                 switchTemp = [devices[pk]["name"], pk, switch_state, voltage/10]
                 switchInfo.append(switchTemp)
-            i = i + 1
         except Exception as error:
             print("An exception occurred:", error)
         #print(switchInfo)
     return render_template("index.html", switches=switchInfo, title=title)
 
 # Route for toggling a switch
-@app.route("/toggle/<device_id>")
-def toggle_switch(device_id):
-    i = int(device_id) - 1
-    current_state = switches[i].status()["dps"]["1"]
-    #new_state = 1 if current_state == 0 else 0
-    if current_state:
-        switches[i].turn_off()
-    else:
-        switches[i].turn_on()
+@app.route("/toggle/<pk>")
+def toggle_switch(pk):
+    #i = int(device_id) - 1
+    print(pk)
+    switch = devices[pk]["switch"]
+    try:
+        current_state = switch.status()["dps"]["1"]
+        #new_state = 1 if current_state == 0 else 0
+        if current_state:
+            switch.turn_off()
+        else:
+            switch.turn_on()
+    except:
+        print("Sem Conexão com a Tomada")
     return redirect("/")
 
 def readConfig():
@@ -162,19 +168,22 @@ config = readConfig()
 devices = config["devices"]
 title = config["title"]
 
-switches = list()
+#switches = list()
+#print(devices)
 for pk in devices:
     try:
-        new_device = tinytuya.OutletDevice(dev_id=devices[pk]['id'],
+        devices[pk]["switch"] = tinytuya.OutletDevice(dev_id=devices[pk]['id'],
                 address=devices[pk]['ip'],
                 local_key=devices[pk]['key'],
-                version=3.4)
-        switches.append(new_device)
+                version=devices[pk]['version'])
+        #devices[pk]["switch"] = "Test"
+        #print(devices[pk])
+        #switches.append(new_device)
     except:
-        print(f"{item[0]} not found")
-        switches.append(None)
+        print(f"{pk} not found")
+        devices[pk]["switch"] = None
 
 if __name__ == '__main__':
     print("Server Running on http://localhost")
-    app.run(host='0.0.0.0', debug=True)
-    #serve(app, host="0.0.0.0", port=80)
+    app.run(host='0.0.0.0', port=8080, debug=True)
+    #serve(app, host="0.0.0.0", port=8080)
