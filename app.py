@@ -37,11 +37,14 @@ devices = {
 """
 class On(Resource):
     def get(self, pk):
-        switch = tinytuya.OutletDevice(dev_id=devices[pk]['id'],
+        try:
+            switch = tinytuya.OutletDevice(dev_id=devices[pk]['id'],
                 address=devices[pk]['ip'],
                 local_key=devices[pk]['key'],
                 version=3.4)
-        switch.turn_on()
+            print(switch.turn_on())
+        except:
+            return "error"
         return f"{devices[pk]['name']} Switch Turned On"
 
 class Off(Resource):
