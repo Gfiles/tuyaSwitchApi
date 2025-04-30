@@ -2,19 +2,20 @@
 # Install required libraries
  sudo apt-get install python-crypto python-pip  # for RPi, Linux
  python3 -m pip install pycryptodome            # or pycrypto or Crypto or pyaes
- python -m tinytuya scan
+ python -m tinytuya scan  #scan to get list of local devices
 https://pypi.org/project/tinytuya/
 https://github.com/jasonacox/tinytuya#setup-wizard---getting-local-keys
-python -m tinytuya wizard (get device id and keys)
+python -m tinytuya wizard (get device id and keys) #Run this command to get the device id and keys
 https://pimylifeup.com/raspberry-pi-flask-web-app/
 """
 from flask import Flask, render_template, request, jsonify, redirect#pip install Flask
-from flask_restful import Resource, Api
+from flask_restful import Resource, Api #pip install Flask-RESTful
 import json
 import os
 import sys
-import tinytuya
-from waitress import serve
+import tinytuya #pip install tinytuya
+from waitress import serve #pip install waitress
+from apscheduler.schedulers.background import BackgroundScheduler #pip install apscheduler
 
 app = Flask(__name__)
 api = Api(app)
@@ -22,56 +23,45 @@ api = Api(app)
 class On(Resource):
     def get(self, pk):
         pk = pk.upper()
-        """
-        switch = tinytuya.OutletDevice(dev_id=devices[pk]['id'],
-                address=devices[pk]['ip'],
-                local_key=devices[pk]['key'],
-                version=3.4)
-        """
-        #print(pk)
-        try:
-            switch = devices[pk]["switch"]
-            switch.turn_on()
-        except:
-            return "error"
-        return f"{devices[pk]['name']} Switch Turned On"
+        for device in devices:
+            if device["name"].upper() == pk:
+                try:
+                    switch = devices["switch"]
+                    switch.turn_on()
+                    device["state"] = True
+                except:
+                    return "error"
+                return f"{devices['name']} Switch Turned On"
 
 class Off(Resource):
     def get(self, pk):
         pk = pk.upper()
-        """
-        switch = tinytuya.OutletDevice(dev_id=devices[pk]['id'],
-                address=devices[pk]['ip'],
-                local_key=devices[pk]['key'],
-                version=3.4)
-        """
-        try:
-            switch = devices[pk]["switch"]
-            switch.turn_off()
-        except:
-            return "error"
-        return f"{devices[pk]['name']} Switch Turned Off"
+        for device in devices:
+            if device["name"].upper() == pk:
+                try:
+                    switch = devices["switch"]
+                    switch.turn_off()
+                    device["state"] = False
+                except:
+                    return "error"
+                return f"{devices['name']} Switch Turned Off"
 
 class Status(Resource):
     def get(self, pk):
         pk = pk.upper()
-        #print(devices[pk]['name'])
-        """
-        switch = tinytuya.OutletDevice(dev_id=devices[pk]['id'],
-                address=devices[pk]['ip'],
-                local_key=devices[pk]['key'],
-                version=3.4)
-        """
-        try:
-            switch = devices[pk]["switch"]
-            if switch.status()['dps']['1']:
-                status = "On"
-            else:
-                status = "Off"
-            #print("Switch Turned off")
-        except:
-            return "error"
-        return f"{devices[pk]['name']} Status: {status}"
+        for device in devices:
+            if device["name"].upper() == pk:
+                try:
+                    switch = devices["switch"]
+                    if switch.status()['dps']['1']:
+                        status = "On"
+                        device["state"] = True
+                    else:
+                        status = "Off"
+                        device["state"] = False
+                except:
+                    return "error"
+                return f"{devices['name']} Status: {status}"
 
 #api.add_resource(Items, '/')
 api.add_resource(On, '/on/<pk>')
@@ -81,74 +71,72 @@ api.add_resource(Status, '/status/<pk>')
 @app.route("/")
 def index():
     switchInfo = []
-    for pk in devices:
-        #print(devices[pk]["switch"])
-        try:
-            #print(pk)
-            switch = devices[pk]["switch"]
-            if switch == None:
-                switchInfo.append([devices[pk]["name"], pk, "offline", 0])
-            else:
-                data = switch.status()
-                #print(data)
-                #print(data)
-                switch_state = data["dps"]["1"]
-                voltage = data["dps"]["20"]
-                switchTemp = [devices[pk]["name"], pk, switch_state, voltage/10]
-                switchInfo.append(switchTemp)
-        except Exception as error:
-            print("An exception occurred:", error)
-        #print(switchInfo)
+    for device in devices:
+        switchInfo.append([device["solution"], device["name"], device["state"], device["voltage"]])
     return render_template("index.html", switches=switchInfo, title=title)
 
 # Route for toggling a switch
 @app.route("/toggle/<pk>")
 def toggle_switch(pk):
     #i = int(device_id) - 1
-    print(pk)
-    switch = devices[pk]["switch"]
-    try:
-        current_state = switch.status()["dps"]["1"]
-        #new_state = 1 if current_state == 0 else 0
-        if current_state:
-            switch.turn_off()
-        else:
-            switch.turn_on()
-    except:
-        print("Sem Conexão com a Tomada")
+    print(f"get Toggle input {pk}")
+    for device in devices:
+        if device["name"] == pk:
+            #print(f"Device {pk} found")
+            switch = device["switch"]
+            print(switch)
+            #print(switch.status())
+            try:
+                current_state = switch.status()["dps"]["1"]
+                #new_state = 1 if current_state == 0 else 0
+                if current_state:
+                    switch.turn_off()
+                else:
+                    switch.turn_on()
+            except:
+                print("Sem Conexão com a Tomada")
     return redirect("/")
 
-def readConfig():
-    settingsFile = os.path.join(cwd, "config.json")
+def readConfig(settingsFile):
+    
     if os.path.isfile(settingsFile):
         with open(settingsFile) as json_file:
             data = json.load(json_file)
     else:
         data = {
                 "title" : "Title",
-                "devices": {
-                    "YDSw063":{
-                        "name":"Solution1",
-                        "id":"abcefghijklmnop",
-                        "ip":"192.168.31.147",
-                        "key":"key_password"
-                    },
-                    "YDSw036":{
-                        "name":"Solution2",
-                        "id":"abcefghijklmnop",
-                        "ip":"192.168.31.148",
-                        "key":"key_password"
-                    },
-                }
+                "devices": []
         }
+        #print(data)
+        for i, device in enumerate(snapShotDevices):
+            data["devices"].append({"name": device["name"], "solution": f"solution {i}"})
         # Serializing json
         json_object = json.dumps(data, indent=4)
-
+        #print(json_object)
         # Writing to config.json
         with open(settingsFile, "w") as outfile:
             outfile.write(json_object)
     return data
 
+def updateSwitches():
+    for device in devices:
+        for snap in snapShotDevices:
+            if device["name"] == snap["name"]:
+                try:
+                    switch = tinytuya.OutletDevice(dev_id=snap['id'],
+                        address=snap['ip'],
+                        local_key=snap['key'],
+                        version=snap['ver'])
+                    device["switch"] = switch
+                    data = switch.status()
+                    device["state"] = data["dps"]["1"]
+                    device["voltage"] = data["dps"]["20"]/10
+                except:
+                    print(f"{device["name"]} not found")
+                    #device["switch"] = None
+                break
+
+# ---------- End Functions ---------- #
 # Get the current working
 # directory (CWD)
 try:
@@ -163,25 +151,24 @@ else:
     
 #print("Current working directory:", cwd)
 
+# Read Snapshot File
+snapShotFile = os.path.join(cwd, "snapshot.json")
+snapShotJson = readConfig(snapShotFile)
+snapShotDevices = snapShotJson["devices"]
+
 # Read Config File
-config = readConfig()
+settingsFile = os.path.join(cwd, "appConfig.json")
+config = readConfig(settingsFile)
 devices = config["devices"]
 title = config["title"]
 
-#switches = list()
-#print(devices)
-for pk in devices:
-    try:
-        devices[pk]["switch"] = tinytuya.OutletDevice(dev_id=devices[pk]['id'],
-                address=devices[pk]['ip'],
-                local_key=devices[pk]['key'],
-                version=devices[pk]['version'])
-        #devices[pk]["switch"] = "Test"
-        #print(devices[pk])
-        #switches.append(new_device)
-    except:
-        print(f"{pk} not found")
-        devices[pk]["switch"] = None
+updateSwitches()
+# create schedluer to run every 5 minutes
+scheduler = BackgroundScheduler()
+scheduler.add_job(func=updateSwitches, trigger="interval", minutes=5)
+scheduler.start()
+print("Scheduler Started")
+print("Finished Getting Devices")
 
 if __name__ == '__main__':
     print("Server Running on http://localhost")
