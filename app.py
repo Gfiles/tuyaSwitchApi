@@ -23,15 +23,16 @@ api = Api(app)
 class On(Resource):
     def get(self, pk):
         pk = pk.upper()
+        print(f"get On input {pk}")
         for device in devices:
             if device["name"].upper() == pk:
                 try:
-                    switch = devices["switch"]
+                    switch = device["switch"]
                     switch.turn_on()
                     device["state"] = True
                 except:
                     return "error"
-                return f"{devices['name']} Switch Turned On"
+                return f"{device['name']} Switch Turned On"
 
 class Off(Resource):
     def get(self, pk):
@@ -39,12 +40,12 @@ class Off(Resource):
         for device in devices:
             if device["name"].upper() == pk:
                 try:
-                    switch = devices["switch"]
+                    switch = device["switch"]
                     switch.turn_off()
                     device["state"] = False
                 except:
                     return "error"
-                return f"{devices['name']} Switch Turned Off"
+                return f"{device['name']} Switch Turned Off"
 
 class Status(Resource):
     def get(self, pk):
@@ -52,16 +53,16 @@ class Status(Resource):
         for device in devices:
             if device["name"].upper() == pk:
                 try:
-                    switch = devices["switch"]
+                    switch = device["switch"]
                     if switch.status()['dps']['1']:
                         status = "On"
-                        device["state"] = True
+                        #device["state"] = True
                     else:
                         status = "Off"
-                        device["state"] = False
+                        #device["state"] = False
                 except:
-                    return "error"
-                return f"{devices['name']} Status: {status}"
+                    return f"{device['name']} Status: Offline"
+                return f"{device['name']} Status: {status}"
 
 #api.add_resource(Items, '/')
 api.add_resource(On, '/on/<pk>')
