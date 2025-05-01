@@ -108,6 +108,7 @@ def readConfig(settingsFile):
     else:
         data = {
                 "title" : "Title",
+                "refresh" : 5,
                 "devices": []
         }
         #print(data)
@@ -145,6 +146,7 @@ def updateSwitches():
             device["switch"] = None
             device["state"] = "offline"
             device["voltage"] = 0
+    return redirect("/")
 
 # ---------- End Functions ---------- #
 # Get the current working
@@ -171,11 +173,12 @@ settingsFile = os.path.join(cwd, "appConfig.json")
 config = readConfig(settingsFile)
 devices = config["devices"]
 title = config["title"]
+refresh = config["refresh"]
 
 updateSwitches()
 # create schedluer to run every 5 minutes
 scheduler = BackgroundScheduler()
-scheduler.add_job(func=updateSwitches, trigger="interval", minutes=5)
+scheduler.add_job(func=updateSwitches, trigger="interval", minutes=refresh)
 scheduler.start()
 print("Scheduler Started")
 print("Finished Getting Devices")
