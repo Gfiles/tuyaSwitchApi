@@ -81,18 +81,21 @@ def toggle_switch(pk):
     #i = int(device_id) - 1
     print(f"get Toggle input {pk}")
     for device in devices:
-        if device["name"] == pk:
+        if device["name"].upper() == pk.upper():
             #print(f"Device {pk} found")
             switch = device["switch"]
             print(switch)
             #print(switch.status())
             try:
                 current_state = switch.status()["dps"]["1"]
+                print(f"Current State: {current_state}")
                 #new_state = 1 if current_state == 0 else 0
                 if current_state:
                     switch.turn_off()
+                    device["state"] = False
                 else:
                     switch.turn_on()
+                    device["state"] = True
             except:
                 print("Sem Conexão com a Tomada")
     return redirect("/")
@@ -120,6 +123,7 @@ def readConfig(settingsFile):
 
 def updateSwitches():
     for device in devices:
+        noDevice = True
         for snap in snapShotDevices:
             if device["name"] == snap["name"]:
                 try:
@@ -131,10 +135,16 @@ def updateSwitches():
                     data = switch.status()
                     device["state"] = data["dps"]["1"]
                     device["voltage"] = data["dps"]["20"]/10
+                    noDevice = False
                 except:
                     print(f"{device["name"]} not found")
                     #device["switch"] = None
                 break
+        if noDevice:
+            print(f"{device["name"]} not found in snapshot")
+            device["switch"] = None
+            device["state"] = "offline"
+            device["voltage"] = 0
 
 # ---------- End Functions ---------- #
 # Get the current working
