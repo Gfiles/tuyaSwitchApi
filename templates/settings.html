@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>{{ title }}</title>
+        <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css" />
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+        />
+        <style>
+            .tuya-button {
+                margin: 10px;
+                min-width: 320px;
+                max-width: 320px;
+                text-align: center;
+                padding: 0.75em;
+                border: 1px solid #ccc;
+                border-radius: 50px;
+                cursor: pointer;
+            }
+            .button:hover {
+                background-color: #3e8e41;
+            }
+            .btn-off {
+                opacity: 0.6;
+                cursor: not-allowed;
+            }
+            /* Additional styling for form inputs and buttons */
+            .w3-input {
+                max-width: 320px;
+                margin-bottom: 10px;
+            }
+            .w3-button {
+                min-width: 100px;
+                border-radius: 50px;
+            }
+            .device-list {
+                max-width: 400px;
+                margin: auto;
+                border-radius: 10px;
+            }
+            .device-row {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 10px;
+            }
+            .device-name {
+                flex: 1;
+                padding: 8px;
+                background-color: #f1f1f1;
+                border-radius: 5px;
+                margin-right: 10px;
+                user-select: none;
+            }
+            .device-solution {
+                flex: 1;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="w3-container w3-teal w3-center">
+            <div style="position: absolute; top: 10px; right: 10px;">
+                <a href="/">
+                    <i class="fas fa-home" style="font-size: 24px;"></i>
+                </a>
+            </div>
+            <h1>{{ title }}</h1>
+        </div>
+        <div class="w3-container w3-center w3-padding-16">
+            <form method="POST" class="w3-container w3-card-4 w3-padding w3-white" style="max-width: 400px; margin: auto; border-radius: 10px;">
+                {% for key, value in config.items() %}
+                    <label class="w3-text-teal" for="{{ key }}">{{ key }}</label>
+                    <input
+                        class="w3-input w3-border w3-round"
+                        type="text"
+                        id="{{ key }}"
+                        name="{{ key }}"
+                        value="{{ value }}"
+                    />
+                {% endfor %}
+                {% if devices %}
+                    <h3>Convert Devices</h3>
+                    <div class="device-list">
+                        {% for device in devices %}
+                            <div class="device-row">
+                                <div class="device-name">{{ device.name }}</div>
+                                <input
+                                    class="w3-input w3-border w3-round device-solution"
+                                    type="text"
+                                    name="device_solution_{{ loop.index0 }}"
+                                    value="{{ device.solution }}"
+                                />
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                <button type="submit" class="w3-button w3-teal w3-round w3-margin-top">
+                    Save
+                </button>
+            </form>
+        </div>
+    </body>
+</html>

@@ -118,6 +118,48 @@ def toggle_switch(pk):
                 print("Sem Conexão com a Tomada")
     return redirect("/")
 
+@app.route("/settings", methods=["GET", "POST"])
+def settings():
+    global config, devices, title, refresh, port
+    if request.method == "POST":
+        # Save the updated settings to appConfig.json
+        form_data = request.form.to_dict(flat=False)
+        # Reconstruct config dict
+        with open(settingsFile, "r") as infile:
+            current_config = json.load(infile)
+        # Update non-devices config keys
+        for key in current_config:
+            if key != "devices":
+                if key in form_data:
+                    current_config[key] = form_data[key][0]
+        # Update devices list solutions
+        devices_list = current_config.get("devices", [])
+        for i, device in enumerate(devices_list):
+            solution_key = f"device_solution_{i}"
+            if solution_key in form_data:
+                device["solution"] = form_data[solution_key][0]
+                for item in devices:
+                    if item["name"] == device["name"]:
+                        item["solution"] = device["solution"]
+        current_config["devices"] = devices_list
+        with open(settingsFile, "w") as outfile:
+            json.dump(current_config, outfile, indent=4)
+        # Reload global config variables
+        config = current_config
+        #devices = config.get("devices", [])
+        title = config.get("title", title)
+        refresh = int(config.get("refresh", refresh))
+        port = int(config.get("port", port))
+        return redirect("/")
+    
+    # Load current settings
+    with open(settingsFile, "r") as infile:
+        current_config = json.load(infile)
+    #devices = current_config.get("devices", [])
+    # Pass devices separately and config without devices
+    config_without_devices = {k: v for k, v in current_config.items() if k != "devices"}
+    return render_template("settings.html", config=config_without_devices, devices=devices, title="Settings")
+
 def readConfig(settingsFile):
     
     if os.path.isfile(settingsFile):
@@ -160,6 +202,7 @@ def updateSwitches():
                 except:
                     print(f"{device["name"]} not found")
                     #device["switch"] = None
+                #print(f"Device {device} found")
                 break
         if noDevice:
             print(f"{device["name"]} not found in snapshot")
@@ -200,7 +243,7 @@ else:
 snapShotFile = os.path.join(cwd, "snapshot.json")
 if not os.path.isfile(snapShotFile):
     print("Snapshot file not found, scanning for devices")
-tinytuya.scan()
+    tinytuya.scan()
 snapShotJson = readConfig(snapShotFile)
 snapShotDevices = snapShotJson["devices"]
 
@@ -209,8 +252,8 @@ settingsFile = os.path.join(cwd, "appConfig.json")
 config = readConfig(settingsFile)
 devices = config["devices"]
 title = config["title"]
-refresh = config["refresh"]
-port = config["port"]
+refresh = int(config["refresh"])
+port = int(config["port"])
 
 updateSwitches()
 # create schedluer to run every 5 minutes
