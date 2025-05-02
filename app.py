@@ -13,13 +13,13 @@ pyinstaller --clean --onefile --add-data "templates*;templates." --add-data "dev
 from flask import Flask, render_template, request, jsonify, redirect#pip install Flask
 from flask_restful import Resource, Api #pip install Flask-RESTful
 import json
+import datetime
 import os
 import sys
 import jinja2
 import tinytuya #pip install tinytuya
 from waitress import serve #pip install waitress
 from apscheduler.schedulers.background import BackgroundScheduler #pip install apscheduler
-
 
 template_loader = ''
 if getattr(sys, 'frozen', False):
@@ -240,10 +240,22 @@ else:
 #templateFolder = os.path.join(cwd, "templates")
 
 # Read Snapshot File
+
 snapShotFile = os.path.join(cwd, "snapshot.json")
+need_scan = False
 if not os.path.isfile(snapShotFile):
     print("Snapshot file not found, scanning for devices")
+    need_scan = True
+else:
+    # Check if snapshot.json is older than 1 day
+    file_mtime = datetime.datetime.fromtimestamp(os.path.getmtime(snapShotFile))
+    if (datetime.datetime.now() - file_mtime).days >= 1:
+        print("Snapshot file is older than 1 day, scanning for devices")
+        need_scan = True
+
+if need_scan:
     tinytuya.scan()
+
 snapShotJson = readConfig(snapShotFile)
 snapShotDevices = snapShotJson["devices"]
 
