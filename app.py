@@ -200,7 +200,8 @@ def updateSwitches():
                     device["voltage"] = data["dps"]["20"]/10
                     noDevice = False
                 except:
-                    print(f"{device["name"]} not found")
+                    pass
+                    #print(f"{device["name"]} not found")
                     #device["switch"] = None
                 #print(f"Device {device} found")
                 break
@@ -224,18 +225,20 @@ if getattr(sys, 'frozen', False):
     cwd = os.path.dirname(sys.executable)
     #copy devices.json to cwd
     devicesFile = os.path.join(cwd, "devices.json")
+    #print(devicesFile)
     if not os.path.isfile(devicesFile):
-        devicesFile = os.path.join(bundle_dir, "devices.json")
-        if os.path.isfile(devicesFile):
+        devicesFileCopy = os.path.join(bundle_dir, "devices.json")
+        if os.path.isfile(devicesFileCopy):
             #copy devices.json to cwd
-            with open(devicesFile, "r") as f:
+            #print("Copying devices.json to cwd")
+            with open(devicesFileCopy, "r") as f:
                 data = f.read()
-            with open(os.path.join(cwd, "devices.json"), "w") as f:
+            with open(devicesFile, "w") as f:
                 f.write(data)
 else:
     cwd = os.path.dirname(this_file)
     
-#print("Current working directory:", cwd)
+print("Current working directory:", cwd)
 #index file
 #templateFolder = os.path.join(cwd, "templates")
 
