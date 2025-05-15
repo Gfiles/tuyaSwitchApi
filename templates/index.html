@@ -3,16 +3,24 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="refresh" content="60">
         <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
         <title>Tuya Switches</title>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
         <style>
+            .grid-container {
+                display: grid;
+                grid-gap: 20px;
+                /*grid-template-columns: repeat({{ number_columns }}, auto);*/
+                grid-template-columns: repeat(auto-fit, minmax({{ minButtonWidth }}px, 1fr));
+    
+            }
+
             .tuya-button {
-                margin: 10px;
-                min-width: 280px;
-                max-width: 50%;
+                /*min-width: 320px;
+                max-width: 320px;*/
                 text-align: center;
-                padding: 0.5em;
+                padding: 0.75em;
                 border: 1px solid #ccc;
                 border-radius: 50px;
                 cursor:pointer;
@@ -25,22 +33,33 @@
             .btn-off {
                 opacity: 0.6;
                 cursor: not-allowed;
+            }
+            .header-icons {
+                position: absolute;
+                top: 10px;
+                right: 10px;
+                display: flex;
+                gap: 15px;
+            }
         </style>
     </head>
     <body>
-        <div class="w3-container w3-teal w3-center">
-            <div style="position: absolute; top: 10px; right: 10px;">
-                <a href="/settings">
+        <div class="w3-container w3-teal w3-center" style="position: relative;">
+            <div class="header-icons">
+                <a href="/settings" title="Settings">
                     <i class="fas fa-cog" style="font-size: 24px;"></i>
+                </a>
+                <a href="/schedule" title="Schedule">
+                    <i class="fas fa-calendar-alt" style="font-size: 24px;"></i>
                 </a>
             </div>
     
             <h1>{{ title }}</h1>
         </div>
-        <div class="w3-center w3-row-padding w3-panel">
+        <div class="w3-center w3-row-padding w3-panel grid-container" >
             {% for switch in switches %}
             <button class="tuya-button
-            {% if switch[2] == "offline" %}
+            {% if switch[2] == "offline" %} 
                 w3-gray btn-off
             {% elif switch[2] == True %} 
                 w3-green 
@@ -49,14 +68,16 @@
             {% endif %}
             " onclick="toggleSwitch('{{ switch[1] }}')">
                 <h2>{{ switch[0] }}</h2>
-                <p>{{ switch[1] }}<br/>
-                {{ switch[3] }} V</p>
+                <h3>{{ switch[1] }}</h3>
+                {{ switch[3] }} V
             </button>
             {% endfor %}
         </div>
         <script>
             function toggleSwitch(device_id) {
-                window.location.href = "/toggle/" + device_id;
+                if (confirm("Are you sure you want to toggle this switch?")) {
+                    window.location.href = "/toggle/" + device_id;
+                }
             }
         </script>
     </body>
