@@ -188,6 +188,7 @@ def readConfig(settingsFile):
         #print(data)
         for i, device in enumerate(snapShotDevices):
             if device["ip"] != "":
+                print(f"Adding device {device['name']} - {device["ip"]} to config")
                 data["devices"].append({"name": device["name"], "solution": f"solution {i}"})
         # Serializing json
         json_object = json.dumps(data, indent=4)
@@ -274,7 +275,6 @@ if need_scan:
 
 snapShotJson = readConfig(snapShotFile)
 snapShotDevices = snapShotJson["devices"]
-
 
 # Read Config File
 settingsFile = os.path.join(cwd, "appConfig.json")
