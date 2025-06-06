@@ -235,6 +235,18 @@ def updateSwitches():
             device["voltage"] = 0
     return redirect("/")
 
+def mergeDevices(dict1, dict2):
+    """
+    Merges two dictionaries recursively.
+    If a key exists in both dictionaries, the value from dict2 will notoverwrite the value from dict1.
+    """
+    dict1List = list()
+    for item1 in dict1["devices"]:
+        dict1List.append(item1["name"])
+    for item2 in dict2["devices"]:
+        if item2["name"] not in dict1List:
+            dict1["devices"].append({"name": item2["name"], "solution": item2["name"]})
+
 # ---------- End Functions ---------- #
 
 # Get the current working
@@ -295,15 +307,17 @@ for device in snapShotDevices:
         }
         snapShotDevicesSmall["devices"].append(toAdd)
 
-#print("Devices found in snapshot:", snapShotDevicesSmall)
+print("Devices found in snapshot:", snapShotDevicesSmall)
 # Read Config File
 settingsFile = os.path.join(cwd, "appConfig.json")
 config = readConfig(settingsFile)
 # merge snapShotDevicesSmall into config
-snapShotDevicesSmall.update(config)  # Merge snapshot devices into config
-#print(snapShotDevicesSmall)
-config = snapShotDevicesSmall  # Update config with snapshot devices
+mergeDevices(config, snapShotDevicesSmall)
+print("----------")
+print(config)
 saveConfig(config, settingsFile)
+sys.exit(0)
+
 devices = config["devices"]
 title = config["title"]
 refresh = int(config["refresh"])
@@ -473,5 +487,5 @@ def schedule():
 
 if __name__ == '__main__':
     print("Server Running on http://localhost")
-    app.run(host='0.0.0.0', port=port, debug=True)
-    #serve(app, host="0.0.0.0", port=port)
+    #app.run(host='0.0.0.0', port=port, debug=True)
+    serve(app, host="0.0.0.0", port=port)
