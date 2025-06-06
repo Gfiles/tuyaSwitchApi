@@ -316,7 +316,6 @@ mergeDevices(config, snapShotDevicesSmall)
 print("----------")
 print(config)
 saveConfig(config, settingsFile)
-sys.exit(0)
 
 devices = config["devices"]
 title = config["title"]
