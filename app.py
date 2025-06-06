@@ -153,8 +153,11 @@ def settings():
             except ValueError:
                 pass
         current_config["devices"] = devices_list
-        with open(settingsFile, "w") as outfile:
-            json.dump(current_config, outfile, indent=4)
+        saveConfig(current_config, settingsFile)
+        # delete
+        #with open(settingsFile, "w") as outfile:
+            #json.dump(current_config, outfile, indent=4)
+
         # Reload global config variables
         config = current_config
         #devices = config.get("devices", [])
@@ -172,6 +175,15 @@ def settings():
     config_without_devices = {k: v for k, v in current_config.items() if k != "devices"}
     return render_template("settings.html", config=config_without_devices, devices=devices, title="Settings")
 
+def saveConfig(config, settingsFile):
+    # Serializing json
+    json_object = json.dumps(config, indent=4)
+    # Writing to config.json
+    with open(settingsFile, "w") as outfile:
+        outfile.write(json_object)
+    print(f"Config saved to {settingsFile}")
+    return config
+
 def readConfig(settingsFile):
     
     if os.path.isfile(settingsFile):
@@ -186,16 +198,13 @@ def readConfig(settingsFile):
                 "devices": []
         }
         #print(data)
-        for i, device in enumerate(snapShotDevices):
-            if device["ip"] != "":
-                print(f"Adding device {device['name']} - {device["ip"]} to config")
-                data["devices"].append({"name": device["name"], "solution": f"solution {i}"})
         # Serializing json
         json_object = json.dumps(data, indent=4)
         #print(json_object)
         # Writing to config.json
-        with open(settingsFile, "w") as outfile:
-            outfile.write(json_object)
+        saveConfig(json_object, settingsFile)
+        #with open(settingsFile, "w") as outfile:
+            #outfile.write(json_object)
     return data
 
 def updateSwitches():
@@ -276,9 +285,25 @@ if need_scan:
 snapShotJson = readConfig(snapShotFile)
 snapShotDevices = snapShotJson["devices"]
 
+#make small version of snapshot devices with only name
+snapShotDevicesSmall = {"devices": []}
+for device in snapShotDevices:
+    if ("ip" in device) and (device["ip"] != ""):
+        toAdd = {
+            "name": device["name"],
+            "solution": device["name"]    
+        }
+        snapShotDevicesSmall["devices"].append(toAdd)
+
+#print("Devices found in snapshot:", snapShotDevicesSmall)
 # Read Config File
 settingsFile = os.path.join(cwd, "appConfig.json")
 config = readConfig(settingsFile)
+# merge snapShotDevicesSmall into config
+snapShotDevicesSmall.update(config)  # Merge snapshot devices into config
+#print(snapShotDevicesSmall)
+config = snapShotDevicesSmall  # Update config with snapshot devices
+saveConfig(config, settingsFile)
 devices = config["devices"]
 title = config["title"]
 refresh = int(config["refresh"])
@@ -416,8 +441,10 @@ def schedule():
                 device["switch"] = None
 
         config["devices"] = devices
-        with open(settingsFile, "w") as outfile:
-            json.dump(config, outfile, indent=4)
+        saveConfig(config, settingsFile)
+        # delete
+        #with open(settingsFile, "w") as outfile:
+            #json.dump(config, outfile, indent=4)
         schedule_device_jobs()
         flash("Schedules updated successfully.")
         return redirect(url_for("schedule"))
