@@ -199,37 +199,26 @@ def readConfig(settingsFile):
         }
         #print(data)
         # Serializing json
-        json_object = json.dumps(data, indent=4)
+        #json_object = json.dumps(data, indent=4)
         #print(json_object)
         # Writing to config.json
-        saveConfig(json_object, settingsFile)
+        saveConfig(data, settingsFile)
         #with open(settingsFile, "w") as outfile:
             #outfile.write(json_object)
     return data
 
 def updateSwitches():
     for device in devices:
-        noDevice = True
-        for snap in snapShotDevices:
-            if device["name"] == snap["name"]:
-                try:
-                    switch = tinytuya.OutletDevice(dev_id=snap['id'],
-                        address=snap['ip'],
-                        local_key=snap['key'],
-                        version=snap['ver'])
-                    device["switch"] = switch
-                    data = switch.status()
-                    device["state"] = data["dps"]["1"]
-                    device["voltage"] = data["dps"]["20"]/10
-                    noDevice = False
-                except:
-                    pass
-                    #print(f"{device["name"]} not found")
-                    #device["switch"] = None
-                #print(f"Device {device} found")
-                break
-        if noDevice:
-            print(f"{device["name"]} not found in snapshot")
+        try:
+            switch = tinytuya.OutletDevice(dev_id=device['id'],
+                address=device['ip'],
+                local_key=device['key'],
+                version=device['ver'])
+            device["switch"] = switch
+            data = switch.status()
+            device["state"] = data["dps"]["1"]
+            device["voltage"] = data["dps"]["20"]/10
+        except:
             device["switch"] = None
             device["state"] = "offline"
             device["voltage"] = 0
@@ -238,15 +227,29 @@ def updateSwitches():
 def mergeDevices(dict1, dict2):
     """
     Merges two dictionaries recursively.
-    If a key exists in both dictionaries, the value from dict2 will notoverwrite the value from dict1.
+    If a key exists in both dictionaries, the value from dict2 will not overwrite the value from dict1.
+    Update IP adrress from 2 dictionary
     """
-    dict1List = list()
-    for item1 in dict1["devices"]:
-        dict1List.append(item1["name"])
-    for item2 in dict2["devices"]:
-        if item2["name"] not in dict1List:
-            dict1["devices"].append({"name": item2["name"], "solution": item2["name"]})
-
+    #print(dict1)
+    #print("----------")
+    #print(dict2)
+    for item2 in dict2:
+        deviceNotFound = True
+        for item1 in dict1["devices"]:
+            if item1["id"] == item2["id"]:
+                #print(f"Device {item1['name']} already exists, skipping")
+                item1["ip"] = item2["ip"]
+                deviceNotFound = False
+                break
+        if deviceNotFound:
+            #print(f"Adding device {item2} to dict1")
+            dict1["devices"].append({"name": item2["name"],
+                                 "solution": item2["name"],
+                                 "id": item2["id"],
+                                 "ip": item2["ip"],
+                                 "key": item2["key"],
+                                 "ver": item2["ver"],})
+    
 # ---------- End Functions ---------- #
 
 # Get the current working
@@ -298,23 +301,25 @@ snapShotJson = readConfig(snapShotFile)
 snapShotDevices = snapShotJson["devices"]
 
 #make small version of snapshot devices with only name
-snapShotDevicesSmall = {"devices": []}
+snapShotDevicesSmall = list()
 for device in snapShotDevices:
-    if ("ip" in device) and (device["ip"] != ""):
+    if device["ip"] != "":
         toAdd = {
             "name": device["name"],
-            "solution": device["name"]    
+            "solution": device["name"],
+            "ip": device["ip"],
+            "id": device["id"],
+            "key": device["key"],
+            "ver": device["ver"]
         }
-        snapShotDevicesSmall["devices"].append(toAdd)
+        snapShotDevicesSmall.append(toAdd)
 
-print("Devices found in snapshot:", snapShotDevicesSmall)
+#print("Devices found in snapshot:", snapShotDevicesSmall)
 # Read Config File
 settingsFile = os.path.join(cwd, "appConfig.json")
 config = readConfig(settingsFile)
 # merge snapShotDevicesSmall into config
 mergeDevices(config, snapShotDevicesSmall)
-print("----------")
-print(config)
 saveConfig(config, settingsFile)
 
 devices = config["devices"]
