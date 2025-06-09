@@ -10,7 +10,7 @@ https://pimylifeup.com/raspberry-pi-flask-web-app/
 
 pyinstaller --clean --onefile --add-data "templates*;templates." --add-data "devices.json;." -n tuyaServer app.py
 """
-from flask import Flask, render_template, request, jsonify, redirect#pip install Flask
+from flask import Flask, render_template, request, jsonify, redirect #pip install Flask
 from flask_restful import Resource, Api #pip install Flask-RESTful
 import json
 import datetime
@@ -215,10 +215,12 @@ def updateSwitches():
                 local_key=device['key'],
                 version=device['ver'])
             device["switch"] = switch
-            data = switch.status()
-            device["state"] = data["dps"]["1"]
-            device["voltage"] = data["dps"]["20"]/10
-        except:
+            data = switch.status()["dps"]
+            #print(data)
+            device["state"] = data.get("1", "offline")
+            device["voltage"] = int(data.get("20", "0"))/10
+        except Exception as error:
+            print(f"tuya error: {error}")
             device["switch"] = None
             device["state"] = "offline"
             device["voltage"] = 0
@@ -249,6 +251,9 @@ def mergeDevices(dict1, dict2):
                                  "ip": item2["ip"],
                                  "key": item2["key"],
                                  "ver": item2["ver"],})
+
+def scanNewDevices():
+    tinytuya.scan()
     
 # ---------- End Functions ---------- #
 
@@ -295,7 +300,7 @@ else:
         need_scan = True
 
 if need_scan:
-    tinytuya.scan()
+    scanNewDevices
 
 snapShotJson = readConfig(snapShotFile)
 snapShotDevices = snapShotJson["devices"]
@@ -333,6 +338,8 @@ updateSwitches()
 # create schedluer to run every 5 minutes
 scheduler = BackgroundScheduler()
 scheduler.add_job(func=updateSwitches, trigger="interval", minutes=refresh)
+# create schedluer to run once a day
+scheduler.add_job(func=scanNewDevices, trigger="interval", hours=24)
 scheduler.start()
 print("Scheduler Started")
 print("Finished Getting Devices")
