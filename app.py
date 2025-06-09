@@ -21,6 +21,10 @@ import tinytuya #pip install tinytuya
 from waitress import serve #pip install waitress
 from apscheduler.schedulers.background import BackgroundScheduler #pip install apscheduler
 
+
+VERSION = "2025.06.09"
+print(f"Version: {VERSION}")
+
 template_loader = ''
 if getattr(sys, 'frozen', False):
     # for the case of running in pyInstaller's exe
