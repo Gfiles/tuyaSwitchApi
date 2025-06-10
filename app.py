@@ -304,7 +304,7 @@ else:
         need_scan = True
 
 if need_scan:
-    scanNewDevices
+    scanNewDevices()
 
 snapShotJson = readConfig(snapShotFile)
 snapShotDevices = snapShotJson["devices"]
