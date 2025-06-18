@@ -10,7 +10,7 @@ https://pimylifeup.com/raspberry-pi-flask-web-app/
 Windows:
 pyinstaller --clean --onefile --add-data "templates*;templates." --add-data "devices.json;." -n tuyaServer app.py
 Linux:
-pyinstaller --clean --onefile --add-data "templates*:." --add-data "devices.json:." -n tuyaServer app.py
+pyinstaller --clean --onefile --add-data "templates*:templates" --add-data "devices.json:." -n tuyaServer app.py
 """
 from flask import Flask, render_template, request, jsonify, redirect #pip install Flask
 from flask_restful import Resource, Api #pip install Flask-RESTful
