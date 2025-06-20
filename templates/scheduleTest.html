@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Schedule Configuration</title>
-    <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css" />
+    <link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
     <style>
         .grid-container {
@@ -61,13 +61,12 @@
         </div>
         <h1>Schedule Configuration</h1>
     </div>
-    <p>This page will allow you to configure scheduling for your switches.</p>
-    <div class="w3-center w3-row-padding w3-panel grid-container">
-        
+    
+    <div class="w3-container w3-center w3-padding-16" >
+        <h4>This page will allow you to configure scheduling for your switches.</h4>
         <form method="POST" action="/schedule">
-            <div id="schedules-container">
-                {% for schedule in schedules %}
-                <div class="w3-card w3-padding w3-margin-bottom" >
+            <div class="w3-flex w3-padding-16" style="flex-direction:row; gap:16px" id="schedules-container">
+                <div class="w3-card w3-padding w3-sand" >
                     <input type="hidden" name="schedule_id[]" value="{{ schedule.id }}" />
                     <label>Name:</label>
                     <input type="text" name="schedule_name[]" value="{{ schedule.name }}" class="w3-input w3-border w3-margin-bottom" required />
@@ -93,7 +92,33 @@
                     </select>
                     <button type="button" class="w3-button w3-red" onclick="this.parentElement.remove()">Remove</button>
                 </div>
-                {% endfor %}
+                <div class="w3-card w3-padding" >
+                    <input type="hidden" name="schedule_id[]" value="{{ schedule.id }}" />
+                    <label>Name:</label>
+                    <input type="text" name="schedule_name[]" value="{{ schedule.name }}" class="w3-input w3-border w3-margin-bottom" required />
+                    <label>Action:</label>
+                    <select name="schedule_action[]" class="w3-select w3-border w3-margin-bottom" required>
+                        <option value="on" {% if schedule.action == 'on' %}selected{% endif %}>On</option>
+                        <option value="off" {% if schedule.action == 'off' %}selected{% endif %}>Off</option>
+                    </select>
+                    <label>Days (comma separated, e.g. mon,tue,wed,thu,fri,sat,sun):</label>
+                    <input type="text" name="schedule_days[]" value="{{ schedule.days | join(',') }}" class="w3-input w3-border w3-margin-bottom" required />
+                    <label>Time (24h format HH:MM):</label>
+                    <input type="time" name="schedule_time[]" value="{{ schedule.time }}" class="w3-input w3-border w3-margin-bottom" required pattern="[0-9]{2}:[0-9]{2}" />
+                    <label>Switches:</label>
+                    <select name="schedule_switchInfo_{{ loop.index0 }}[]" multiple size="5" class="w3-select w3-border w3-margin-bottom" style="height: auto;">
+                        {% for device in schedule["switchInfo"] %}
+                        <option value="{{ device.id }}" 
+                            {% if device.selected %}
+                            selected
+                            {% endif %} >
+                            {{ device.name }} - {{ device.solution }} 
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" class="w3-button w3-red" onclick="this.parentElement.remove()">Remove</button>
+                </div>
+                
             </div>
             <button type="button" class="w3-button w3-green" onclick="addSchedule()">Create</button>
             <br/><br/>
