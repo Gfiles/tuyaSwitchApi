@@ -181,83 +181,6 @@ def settings():
     config_without_devices = {k: v for k, v in current_config.items() if k != "devices"}
     return render_template("settings.html", config=config_without_devices, devices=devices, title="Settings")
 
-@app.route("/schedule", methods=["GET", "POST"])
-def schedule():
-    global devices, config
-    if request.method == "POST":
-        # Parse form data to update schedules and device associations
-        schedules = []
-        schedule_ids = request.form.getlist("schedule_id")
-        schedule_names = request.form.getlist("schedule_name")
-        schedule_actions = request.form.getlist("schedule_action")
-        schedule_days = request.form.getlist("schedule_days")
-        schedule_times = request.form.getlist("schedule_time")
-        #schedule_devices = request.form.getlist("device_schedule_ids")
-        # Remove empty schedule names and their corresponding data
-
-        for i in range(len(schedule_ids)):
-            sid = schedule_ids[i]
-            if not sid:
-                sid = str(uuid4())
-            name = schedule_names[i]
-            action = schedule_actions[i].lower()
-            days = schedule_days[i].split(",") if schedule_days[i] else []
-            time_str = schedule_times[i]
-            schedules.append({
-                "id": sid,
-                "name": name,
-                "action": action,
-                "days": days,
-                "time": time_str
-            })
-        config["schedules"] = schedules
-
-        # Update device schedule associations
-        for device in devices:
-            device_schedule_ids = request.form.getlist(f"device_{device['name']}_schedules")
-            device["schedules"] = device_schedule_ids
-
-        # Remove non-serializable keys before saving
-        for device in devices:
-            if "switch" in device:
-                device["switch"] = None
-
-        config["devices"] = devices
-        saveConfig(config, settingsFile)
-        # delete
-        #with open(settingsFile, "w") as outfile:
-            #json.dump(config, outfile, indent=4)
-        schedule_device_jobs()
-        flash("Schedules updated successfully.")
-        return redirect(url_for("schedule"))
-
-    # GET method: show schedules and devices
-    schedules = config.get("schedules", [])
-    
-    switchInfo = list()
-    for schedule in schedules:
-        for device in devices:
-            # run trough list of devices and get their schedules
-            for devInSchedule in schedule["devices"]:
-                if devInSchedule == device["id"]:
-                    switchInfo.append({
-                        "name": device.get("name", ""),
-                        "solution": device.get("solution", ""),
-                        "id": device.get("id", ""),
-                        "selected": True
-                    })
-                    break
-                switchInfo.append({
-                        "name": device.get("name", ""),
-                        "solution": device.get("solution", ""),
-                        "id": device.get("id", ""),
-                        "selected": False
-                    })
-        schedule["switchInfo"] = switchInfo
-    #print(f"Schedules: {schedules}")
-
-    return render_template("schedule.html", schedules=schedules, devices=devices, title="Schedule Configuration")
-
 def saveConfig(config, settingsFile):
     # Serializing json
     json_object = json.dumps(config, indent=4)
@@ -427,7 +350,154 @@ scheduler.start()
 print("Scheduler Started")
 print("Finished Getting Devices")
 
+from flask import flash, url_for
 
+# Dictionary to keep track of scheduled jobs by device name
+scheduled_jobs = {}
+
+def clear_scheduled_jobs():
+    for job_id in list(scheduled_jobs.values()):
+        try:
+            scheduler.remove_job(job_id)
+        except:
+            pass
+    scheduled_jobs.clear()
+
+def schedule_device_jobs():
+    clear_scheduled_jobs()
+    for device in devices:
+        schedule_list = device.get("schedule", [])
+        for idx, entry in enumerate(schedule_list):
+            time_str = entry.get("time")
+            action = entry.get("action", "").lower()
+            if not time_str or action not in ["on", "off"]:
+                continue
+            try:
+                hour, minute = map(int, time_str.split(":"))
+            except:
+                continue
+            job_id = f"{device['name']}_{idx}"
+            # Remove existing job if any
+            if job_id in scheduled_jobs:
+                try:
+                    scheduler.remove_job(job_id)
+                except:
+                    pass
+            # Schedule job
+            if action == "on":
+                scheduler.add_job(func=lambda d=device: d["switch"].turn_on() if d["switch"] else None,
+                                  trigger="cron", hour=hour, minute=minute, id=job_id)
+            else:
+                scheduler.add_job(func=lambda d=device: d["switch"].turn_off() if d["switch"] else None,
+                                  trigger="cron", hour=hour, minute=minute, id=job_id)
+            scheduled_jobs[job_id] = job_id
+
+from uuid import uuid4
+
+def get_schedule_by_id(schedule_id):
+    for schedule in config.get("schedules", []):
+        if schedule["id"] == schedule_id:
+            return schedule
+    return None
+
+def schedule_device_jobs():
+    clear_scheduled_jobs()
+    schedules = config.get("schedules", [])
+    devices_map = {device["name"]: device for device in devices}
+    for schedule in schedules:
+        schedule_id = schedule["id"]
+        action = schedule.get("action", "").lower()
+        days = schedule.get("days", [])
+        time_str = schedule.get("time", "")
+        if not time_str or action not in ["on", "off"] or not days:
+            continue
+        try:
+            hour, minute = map(int, time_str.split(":"))
+        except:
+            continue
+        # Find devices associated with this schedule
+        associated_devices = [device for device in devices if schedule_id in device.get("schedules", [])]
+        for device in associated_devices:
+            job_id = f"{device['name']}_{schedule_id}"
+            if job_id in scheduled_jobs:
+                try:
+                    scheduler.remove_job(job_id)
+                except:
+                    pass
+            # Schedule job for each day
+            for day in days:
+                scheduler.add_job(func=lambda d=device, a=action: d["switch"].turn_on() if a == "on" and d["switch"] else d["switch"].turn_off() if d["switch"] else None,
+                                  trigger="cron", day_of_week=day.lower(), hour=hour, minute=minute, id=job_id)
+            scheduled_jobs[job_id] = job_id
+
+@app.route("/schedule", methods=["GET", "POST"])
+def schedule():
+    global devices, config
+    if request.method == "POST":
+        # Parse form data to update schedules and device associations
+        schedules = []
+        schedule_ids = request.form.getlist("schedule_id")
+        schedule_names = request.form.getlist("schedule_name")
+        schedule_actions = request.form.getlist("schedule_action")
+        schedule_days = request.form.getlist("schedule_days")
+        schedule_times = request.form.getlist("schedule_time")
+        #schedule_devices = request.form.getlist("device_schedule_ids")
+        # Remove empty schedule names and their corresponding data
+
+        for i in range(len(schedule_ids)):
+            sid = schedule_ids[i]
+            if not sid:
+                sid = str(uuid4())
+            name = schedule_names[i]
+            action = schedule_actions[i].lower()
+            days = schedule_days[i].split(",") if schedule_days[i] else []
+            time_str = schedule_times[i]
+            schedules.append({
+                "id": sid,
+                "name": name,
+                "action": action,
+                "days": days,
+                "time": time_str
+            })
+        config["schedules"] = schedules
+
+        # Update device schedule associations
+        for device in devices:
+            device_schedule_ids = request.form.getlist(f"device_{device['name']}_schedules")
+            device["schedules"] = device_schedule_ids
+
+        # Remove non-serializable keys before saving
+        for device in devices:
+            if "switch" in device:
+                device["switch"] = None
+
+        config["devices"] = devices
+        saveConfig(config, settingsFile)
+        # delete
+        #with open(settingsFile, "w") as outfile:
+            #json.dump(config, outfile, indent=4)
+        schedule_device_jobs()
+        flash("Schedules updated successfully.")
+        return redirect(url_for("schedule"))
+
+    # GET method: show schedules and devices
+    schedules = config.get("schedules", [])
+    """
+    #devices_map = {device["name"]: device for device in devices}
+    # Prepare schedule info with associated devices
+    schedule_info = []
+    for schedule in schedules:
+        #associated_devices = [device["name"] for device in devices if schedule["id"] in device.get("schedules", [])]
+        schedule_info.append({
+            "id": schedule.get("id", ""),
+            "name": schedule.get("name", ""),
+            "action": schedule.get("action", ""),
+            "days": schedule.get("days", []),
+            "time": schedule.get("time", ""),
+            "devices": schedule.get("devices", ""),
+        })
+    """
+    return render_template("schedule.html", schedules=schedules, devices=devices, title="Schedule Configuration")
 
 # Call schedule_device_jobs on startup to schedule existing jobs
 #schedule_device_jobs()

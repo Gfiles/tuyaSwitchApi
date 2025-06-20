@@ -61,12 +61,12 @@
             <button class="tuya-button
             {% if switch[2] == "offline" %} 
                 w3-gray btn-off
-            {% elif switch[2] == True %} 
+            {% elif switch[2] %} 
                 w3-green 
             {% else %}
                 w3-red 
             {% endif %}
-            " onclick="toggleSwitch('{{ switch[1] }}')">
+             onclick="toggleSwitch('{{ switch[1] }}')">
                 <h2>{{ switch[0] }}</h2>
                 <h3>{{ switch[1] }}</h3>
                 {{ switch[3] }} V
