@@ -4,6 +4,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.exe
+test.py
 # C extensions
 *.so
 

@@ -24,7 +24,7 @@ import tinytuya #pip install tinytuya
 from waitress import serve #pip install waitress
 from apscheduler.schedulers.background import BackgroundScheduler #pip install apscheduler
 
-
+# ---------- Start Configurations ---------- #
 VERSION = "2025.06.20"
 print(f"Version: {VERSION}")
 
@@ -43,13 +43,13 @@ template_env = jinja2.Environment(loader=template_loader)
 
 app = Flask(__name__)
 api = Api(app)
-
+# ---------- End Configurations ---------- #
+# ---------- Start Classes ---------- #
 class On(Resource):
     def get(self, pk):
-        pk = pk.upper()
         print(f"get On input {pk}")
         for device in devices:
-            if device["name"].upper() == pk:
+            if device["id"] == pk:
                 try:
                     switch = device["switch"]
                     switch.turn_on()
@@ -60,9 +60,8 @@ class On(Resource):
 
 class Off(Resource):
     def get(self, pk):
-        pk = pk.upper()
         for device in devices:
-            if device["name"].upper() == pk:
+            if device["id"] == pk:
                 try:
                     switch = device["switch"]
                     switch.turn_off()
@@ -73,9 +72,8 @@ class Off(Resource):
 
 class Status(Resource):
     def get(self, pk):
-        pk = pk.upper()
         for device in devices:
-            if device["name"].upper() == pk:
+            if device["id"] == pk:
                 try:
                     switch = device["switch"]
                     if switch.status()['dps']['1']:
@@ -92,7 +90,8 @@ class Status(Resource):
 api.add_resource(On, '/on/<pk>')
 api.add_resource(Off, '/off/<pk>')
 api.add_resource(Status, '/status/<pk>')
-
+# ---------- End Classes ---------- #
+# ---------- Start Routing Functions ---------- #
 @app.route("/")
 def index():
     switchInfo = []
@@ -101,7 +100,8 @@ def index():
             device.get("solution", ""),
             device.get("name", ""),
             device.get("state", False),
-            device.get("voltage", 0)
+            device.get("voltage", 0),
+            device.get("id", "")
         ])
     return render_template("index.html", switches=switchInfo, title=title, minButtonWidth=minButtonWidth)
 
@@ -111,7 +111,7 @@ def toggle_switch(pk):
     #i = int(device_id) - 1
     print(f"get Toggle input {pk}")
     for device in devices:
-        if device["name"].upper() == pk.upper():
+        if device["id"] == pk:
             #print(f"Device {pk} found")
             switch = device["switch"]
             print(switch)
@@ -187,7 +187,7 @@ def schedule():
     global devices, config
     if request.method == "POST":
         form_data = request.form.to_dict(flat=False)
-        print(f"Form Data: {form_data}")
+        #print(f"Form Data: {form_data}")
         # Parse form data to update schedules and device associations
         schedules = []
         schedule_ids = request.form.getlist("schedule_id")
@@ -222,26 +222,7 @@ def schedule():
         #print(f"Updated Schedules: {schedules}")
         config["schedules"] = schedules
         saveConfig(config, settingsFile)
-        """
-        # Update device schedule associations
-        for device in devices:
-            device_schedule_ids = request.form.getlist(f"device_{device['name']}_schedules")
-            device["schedules"] = device_schedule_ids
-
-        # Remove non-serializable keys before saving
-        for device in devices:
-            if "switch" in device:
-                device["switch"] = None
-
-        config["devices"] = devices
-        saveConfig(config, settingsFile)
-        # delete
-        #with open(settingsFile, "w") as outfile:
-            #json.dump(config, outfile, indent=4)
-        schedule_device_jobs()
-        flash("Schedules updated successfully.")
-        return redirect(url_for("schedule"))
-        """
+        updateApScheduler()
         return redirect("/")
     # GET method: show schedules and devices
     schedules = config.get("schedules", [])
@@ -273,12 +254,72 @@ def schedule():
 
     return render_template("schedule.html", schedules=schedules, devices=devices, title="Schedule Configuration")
 
+# ---------- End Routing Functions ---------- #
+# ---------- Start Functions ---------- #
+
+def updateApScheduler():
+    """
+    Updates the APScheduler with the current schedules.
+    This function should be called whenever schedules are modified.
+    """
+    scheduler.remove_all_jobs()
+    # create schedluer to run every 5 minutes
+    scheduler.add_job(func=updateSwitches, trigger="interval", minutes=refresh)
+    # create schedluer to run once a day
+    scheduler.add_job(func=scanNewDevices, trigger="interval", hours=24)
+
+    for schedule in config.get("schedules", []):
+        #print(f"Adding job for schedule: {schedule}")
+        scheduler.add_job(
+            func=executeSchedule,
+            trigger='cron',
+            day_of_week=','.join(schedule['days']),
+            hour=int(schedule['time'].split(':')[0]),
+            minute=int(schedule['time'].split(':')[1]),
+            args=[schedule['action'], schedule['devices']],
+        )
+    print("Scheduler updated with new schedules.")
+
+def executeSchedule(action, scheduledDevices):
+    """
+    Executes the action for the given schedule.
+    This function should be called by the scheduler.
+    """
+    #print(f"Executing action: {action}")
+    #print(f"Devices to control: {scheduledDevices}")
+    # Here you would add the logic to turn on/off devices
+    for device_id in scheduledDevices:
+        for device in config["devices"] :
+            if device["id"] == device_id:
+                switch = device["switch"]
+                if switch:
+                    try:
+                        if action == "on":
+                            switch.turn_on()
+                            device["state"] = True
+                        elif action == "off":
+                            switch.turn_off()
+                            device["state"] = False
+                        print(f"Action {action} executed on device {device['name']}")
+                    except Exception as e:
+                        print(f"Error executing action {action} on device {device['name']}: {e}")
+                else:
+                    print(f"No switch found for device {device['name']}")
+
+def sortDevicesByName(devices):
+    """
+    Sorts the devices list by the 'solution' key.
+    """
+    return sorted(devices, key=lambda x: x.get('solution', '').lower())
+
 def search_partial_key(dictionary, partial_key):
     matching_keys = [key for key in dictionary.keys() if partial_key in key]
     return matching_keys
 
 def saveConfig(config, settingsFile):
     # Serializing json
+    #sort devices by name
+    config["devices"] = sortDevicesByName(config["devices"])
     tempConfig = config.copy()
     # remove switch key from devices
     for device in tempConfig["devices"]:
@@ -443,16 +484,11 @@ minButtonWidth = int(config.get("minButtonWidth", 300))
 #print(f"Number of columns: {number_columns}")
 
 updateSwitches()
-# create schedluer to run every 5 minutes
 scheduler = BackgroundScheduler()
-scheduler.add_job(func=updateSwitches, trigger="interval", minutes=refresh)
-# create schedluer to run once a day
-scheduler.add_job(func=scanNewDevices, trigger="interval", hours=24)
+updateApScheduler()
 scheduler.start()
 print("Scheduler Started")
 print("Finished Getting Devices")
-
-
 
 # Call schedule_device_jobs on startup to schedule existing jobs
 #schedule_device_jobs()
