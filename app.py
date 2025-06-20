@@ -12,6 +12,7 @@ pyinstaller --clean --onefile --add-data "templates*;templates." --add-data "dev
 Linux:
 pyinstaller --clean --onefile --add-data "templates*:templates" --add-data "devices.json:." -n tuyaServer app.py
 """
+from uuid import uuid4
 from flask import Flask, render_template, request, jsonify, redirect #pip install Flask
 from flask_restful import Resource, Api #pip install Flask-RESTful
 import json
@@ -24,7 +25,7 @@ from waitress import serve #pip install waitress
 from apscheduler.schedulers.background import BackgroundScheduler #pip install apscheduler
 
 
-VERSION = "2025.06.09"
+VERSION = "2025.06.20"
 print(f"Version: {VERSION}")
 
 template_loader = ''
@@ -185,6 +186,8 @@ def settings():
 def schedule():
     global devices, config
     if request.method == "POST":
+        form_data = request.form.to_dict(flat=False)
+        print(f"Form Data: {form_data}")
         # Parse form data to update schedules and device associations
         schedules = []
         schedule_ids = request.form.getlist("schedule_id")
@@ -192,8 +195,12 @@ def schedule():
         schedule_actions = request.form.getlist("schedule_action")
         schedule_days = request.form.getlist("schedule_days")
         schedule_times = request.form.getlist("schedule_time")
-        #schedule_devices = request.form.getlist("device_schedule_ids")
-        # Remove empty schedule names and their corresponding data
+        deviceKeys = search_partial_key(form_data, "schedule_devices")
+        #print(f"List of device Keys: {deviceKeys}")
+        deviceList = list()
+        for key in deviceKeys:
+            deviceList.append(form_data[key])
+        #print(f"List of device List: {deviceList}")
 
         for i in range(len(schedule_ids)):
             sid = schedule_ids[i]
@@ -208,10 +215,14 @@ def schedule():
                 "name": name,
                 "action": action,
                 "days": days,
-                "time": time_str
+                "time": time_str,
+                "devices": deviceList[i]
             })
+        #config["schedules"] = schedules
+        #print(f"Updated Schedules: {schedules}")
         config["schedules"] = schedules
-
+        saveConfig(config, settingsFile)
+        """
         # Update device schedule associations
         for device in devices:
             device_schedule_ids = request.form.getlist(f"device_{device['name']}_schedules")
@@ -230,13 +241,15 @@ def schedule():
         schedule_device_jobs()
         flash("Schedules updated successfully.")
         return redirect(url_for("schedule"))
-
+        """
+        return redirect("/")
     # GET method: show schedules and devices
     schedules = config.get("schedules", [])
     
     switchInfo = list()
     for schedule in schedules:
         for device in devices:
+            deviceNotSelected = True 
             # run trough list of devices and get their schedules
             for devInSchedule in schedule["devices"]:
                 if devInSchedule == device["id"]:
@@ -246,7 +259,9 @@ def schedule():
                         "id": device.get("id", ""),
                         "selected": True
                     })
+                    deviceNotSelected = False
                     break
+            if deviceNotSelected:
                 switchInfo.append({
                         "name": device.get("name", ""),
                         "solution": device.get("solution", ""),
@@ -258,9 +273,19 @@ def schedule():
 
     return render_template("schedule.html", schedules=schedules, devices=devices, title="Schedule Configuration")
 
+def search_partial_key(dictionary, partial_key):
+    matching_keys = [key for key in dictionary.keys() if partial_key in key]
+    return matching_keys
+
 def saveConfig(config, settingsFile):
     # Serializing json
-    json_object = json.dumps(config, indent=4)
+    tempConfig = config.copy()
+    # remove switch key from devices
+    for device in tempConfig["devices"]:
+        if "switch" in device:
+            del device["switch"]
+    #print(f"Saving config:\n {config}")
+    json_object = json.dumps(tempConfig, indent=4)
     # Writing to config.json
     with open(settingsFile, "w") as outfile:
         outfile.write(json_object)
