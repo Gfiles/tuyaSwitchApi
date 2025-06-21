@@ -21,6 +21,7 @@ import datetime
 import os
 import sys
 import jinja2
+import requests #pip install requests
 import tinytuya #pip install tinytuya
 from waitress import serve #pip install waitress
 from apscheduler.schedulers.background import BackgroundScheduler #pip install apscheduler
@@ -63,6 +64,7 @@ class Off(Resource):
             switch = switches.get(pk)
             switch.turn_off()
             logging.info(f"Switch {pk} turned off")
+            logging.info(f"Request info: {getRequestInfo()}")
             #device["state"] = False
         except:
             return "error"
@@ -83,6 +85,7 @@ class Status(Resource):
                 except:
                     return f"{device['name']} Status: Offline"
                 logging.info(f"Status of {pk} returned as {status}")
+                logging.info(f"Request info: {getRequestInfo()}")
                 return f"{device['name']} Status: {status}"
             break
 
@@ -122,15 +125,16 @@ def toggle_switch(pk):
                 #new_state = 1 if current_state == 0 else 0
                 if current_state:
                     switch.turn_off()
-                    logging.info(f"Switch {pk} toggled to off")
+                    logging.info(f"Switch {device["name"]} toggled to off")
                     device["state"] = False
                 else:
                     switch.turn_on()
-                    logging.info(f"Switch {pk} toggled to on")
+                    logging.info(f"Switch {device["name"]} toggled to on")
                     device["state"] = True
             except:
                 print("Sem Conexão com a Tomada")
                 logging.error(f"Error toggling switch {pk}")
+            logging.info(f"Request info: {getRequestInfo()}")
             break
     return redirect("/")
 
@@ -261,6 +265,28 @@ def schedule():
 
 # ---------- End Routing Functions ---------- #
 # ---------- Start Functions ---------- #
+
+def getRequestInfo():
+    # Get IP address
+    client_ip = request.remote_addr
+    forwarded_ip = request.headers.get('X-Forwarded-For', client_ip)
+
+    # Get browser details
+    user_agent = request.user_agent.string
+
+    # Get location data
+    #response = requests.get(f"https://ipinfo.io/{forwarded_ip}/json")
+    #location_data = response.json()
+
+    return {
+        "IP Address": forwarded_ip,
+        "Browser": user_agent
+    }
+    return {
+        "IP Address": forwarded_ip,
+        "Browser": user_agent,
+        "Location": location_data
+    }
 
 def updateApScheduler():
     """
