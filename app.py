@@ -12,6 +12,7 @@ pyinstaller --clean --onefile --add-data "templates*;templates." --add-data "dev
 Linux:
 pyinstaller --clean --onefile --add-data "templates*:templates" --add-data "devices.json:." -n tuyaServer app.py
 """
+import logging
 from uuid import uuid4
 from flask import Flask, render_template, request, jsonify, redirect #pip install Flask
 from flask_restful import Resource, Api #pip install Flask-RESTful
@@ -50,6 +51,7 @@ class On(Resource):
         try:
             switch = switches.get(pk)
             switch.turn_on()
+            logging.info(f"Switch {pk} turned on")
             #device["state"] = True
         except:
             return "error"
@@ -60,6 +62,7 @@ class Off(Resource):
         try:
             switch = switches.get(pk)
             switch.turn_off()
+            logging.info(f"Switch {pk} turned off")
             #device["state"] = False
         except:
             return "error"
@@ -79,6 +82,7 @@ class Status(Resource):
                         #device["state"] = False
                 except:
                     return f"{device['name']} Status: Offline"
+                logging.info(f"Status of {pk} returned as {status}")
                 return f"{device['name']} Status: {status}"
             break
 
@@ -118,12 +122,15 @@ def toggle_switch(pk):
                 #new_state = 1 if current_state == 0 else 0
                 if current_state:
                     switch.turn_off()
+                    logging.info(f"Switch {pk} toggled to off")
                     device["state"] = False
                 else:
                     switch.turn_on()
+                    logging.info(f"Switch {pk} toggled to on")
                     device["state"] = True
             except:
                 print("Sem Conexão com a Tomada")
+                logging.error(f"Error toggling switch {pk}")
             break
     return redirect("/")
 
@@ -169,6 +176,7 @@ def settings():
         refresh = int(config.get("refresh", refresh))
         port = int(config.get("port", port))
         minButtonWidth = int(current_config.get("minButtonWidth", 3))
+        logging.info("Settings updated successfully")
         return redirect("/")
     
     # Load current settings
@@ -276,6 +284,7 @@ def updateApScheduler():
             args=[schedule['action'], schedule['devices']],
         )
     print("Scheduler updated with new schedules.")
+    logging.info("Scheduler updated with new schedules.")
 
 def executeSchedule(action, scheduledDevices):
     """
@@ -300,9 +309,11 @@ def executeSchedule(action, scheduledDevices):
                         switch.turn_off()
                         device["state"] = False
                     print(f"Action {action} executed on device {device['name']}")
+                    logging.info(f"Action {action} executed on device {device['name']}")
                 except Exception as e:
                     print(f"Error executing action {action} on device {device['name']}: {e}")
-                break
+                    logging.error(f"Error executing action {action} on device {device['name']}: {e}")
+                break  # Exit the loop after finding the device
 
 def sortDevicesByName(newDict):
     """
@@ -363,7 +374,7 @@ def updateSwitches():
             device["state"] = data.get("1", "offline")
             device["voltage"] = int(data.get("20", "0"))/10
         except Exception as error:
-            print(f"tuya error: {error}")
+            logging.error(f"Error updating switch {device['id']}: {error}")
             switches[device['id']] = None
             device["state"] = "offline"
             device["voltage"] = 0
@@ -397,6 +408,7 @@ def mergeDevices(dict1, dict2):
 
 def scanNewDevices():
     tinytuya.scan()
+    logging.info("Scanning for new devices...")
     
 # ---------- End Functions ---------- #
 
@@ -411,7 +423,6 @@ if getattr(sys, 'frozen', False):
     cwd = os.path.dirname(sys.executable)
     #copy devices.json to cwd
     devicesFile = os.path.join(cwd, "devices.json")
-    #print(devicesFile)
     if not os.path.isfile(devicesFile):
         devicesFileCopy = os.path.join(bundle_dir, "devices.json")
         if os.path.isfile(devicesFileCopy):
@@ -428,8 +439,15 @@ print("Current working directory:", cwd)
 #index file
 #templateFolder = os.path.join(cwd, "templates")
 
-# Read Snapshot File
+#Create logging system anda save to log file
+# Create a logger
+logging.basicConfig(
+    filename=os.path.join(cwd, 'app.log'),
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
+# Read Snapshot File
 snapShotFile = os.path.join(cwd, "snapshot.json")
 need_scan = False
 if not os.path.isfile(snapShotFile):
@@ -490,5 +508,6 @@ print("Finished Getting Devices")
 
 if __name__ == '__main__':
     print("Server Running on http://localhost")
+    logging.info("Starting Flask server on port %d", port)
     #app.run(host='0.0.0.0', port=port, debug=True)
     serve(app, host="0.0.0.0", port=port)
