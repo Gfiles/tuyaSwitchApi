@@ -47,35 +47,30 @@ api = Api(app)
 # ---------- Start Classes ---------- #
 class On(Resource):
     def get(self, pk):
-        print(f"get On input {pk}")
-        for device in devices:
-            if device["id"] == pk:
-                try:
-                    switch = device["switch"]
-                    switch.turn_on()
-                    device["state"] = True
-                except:
-                    return "error"
-                return f"{device['name']} Switch Turned On"
+        try:
+            switch = switches.get(pk)
+            switch.turn_on()
+            #device["state"] = True
+        except:
+            return "error"
+        return f"{pk} Switch Turned On"
 
 class Off(Resource):
     def get(self, pk):
-        for device in devices:
-            if device["id"] == pk:
-                try:
-                    switch = device["switch"]
-                    switch.turn_off()
-                    device["state"] = False
-                except:
-                    return "error"
-                return f"{device['name']} Switch Turned Off"
+        try:
+            switch = switches.get(pk)
+            switch.turn_off()
+            #device["state"] = False
+        except:
+            return "error"
+        return f"{pk} Switch Turned Off"
 
 class Status(Resource):
     def get(self, pk):
         for device in devices:
             if device["id"] == pk:
                 try:
-                    switch = device["switch"]
+                    switch = switches.get(pk)
                     if switch.status()['dps']['1']:
                         status = "On"
                         #device["state"] = True
@@ -85,6 +80,7 @@ class Status(Resource):
                 except:
                     return f"{device['name']} Status: Offline"
                 return f"{device['name']} Status: {status}"
+            break
 
 #api.add_resource(Items, '/')
 api.add_resource(On, '/on/<pk>')
@@ -113,8 +109,8 @@ def toggle_switch(pk):
     for device in devices:
         if device["id"] == pk:
             #print(f"Device {pk} found")
-            switch = device["switch"]
-            print(switch)
+            switch = switches.get(pk)
+            #print(switch)
             #print(switch.status())
             try:
                 current_state = switch.status()["dps"]["1"]
@@ -128,6 +124,7 @@ def toggle_switch(pk):
                     device["state"] = True
             except:
                 print("Sem Conexão com a Tomada")
+            break
     return redirect("/")
 
 @app.route("/settings", methods=["GET", "POST"])
@@ -288,29 +285,30 @@ def executeSchedule(action, scheduledDevices):
     #print(f"Executing action: {action}")
     #print(f"Devices to control: {scheduledDevices}")
     # Here you would add the logic to turn on/off devices
+    #print(devices)
+    #print("--------------")
+    #print(config["devices"])
     for device_id in scheduledDevices:
-        for device in config["devices"] :
+        for device in devices:
             if device["id"] == device_id:
-                switch = device["switch"]
-                if switch:
-                    try:
-                        if action == "on":
-                            switch.turn_on()
-                            device["state"] = True
-                        elif action == "off":
-                            switch.turn_off()
-                            device["state"] = False
-                        print(f"Action {action} executed on device {device['name']}")
-                    except Exception as e:
-                        print(f"Error executing action {action} on device {device['name']}: {e}")
-                else:
-                    print(f"No switch found for device {device['name']}")
+                switch = switches.get(device_id)
+                try:
+                    if action == "on":
+                        switch.turn_on()
+                        device["state"] = True
+                    elif action == "off":
+                        switch.turn_off()
+                        device["state"] = False
+                    print(f"Action {action} executed on device {device['name']}")
+                except Exception as e:
+                    print(f"Error executing action {action} on device {device['name']}: {e}")
+                break
 
-def sortDevicesByName(devices):
+def sortDevicesByName(newDict):
     """
     Sorts the devices list by the 'solution' key.
     """
-    return sorted(devices, key=lambda x: x.get('solution', '').lower())
+    return sorted(newDict, key=lambda x: x.get('solution', '').lower())
 
 def search_partial_key(dictionary, partial_key):
     matching_keys = [key for key in dictionary.keys() if partial_key in key]
@@ -319,14 +317,10 @@ def search_partial_key(dictionary, partial_key):
 def saveConfig(config, settingsFile):
     # Serializing json
     #sort devices by name
-    config["devices"] = sortDevicesByName(config["devices"])
-    tempConfig = config.copy()
-    # remove switch key from devices
-    for device in tempConfig["devices"]:
-        if "switch" in device:
-            del device["switch"]
+    devices = sortDevicesByName(config["devices"])
+    #print(devices)
     #print(f"Saving config:\n {config}")
-    json_object = json.dumps(tempConfig, indent=4)
+    json_object = json.dumps(config, indent=4)
     # Writing to config.json
     with open(settingsFile, "w") as outfile:
         outfile.write(json_object)
@@ -363,14 +357,14 @@ def updateSwitches():
                 address=device['ip'],
                 local_key=device['key'],
                 version=device['ver'])
-            device["switch"] = switch
+            switches[device['id']] = switch
             data = switch.status()["dps"]
             #print(data)
             device["state"] = data.get("1", "offline")
             device["voltage"] = int(data.get("20", "0"))/10
         except Exception as error:
             print(f"tuya error: {error}")
-            device["switch"] = None
+            switches[device['id']] = None
             device["state"] = "offline"
             device["voltage"] = 0
     return redirect("/")
@@ -482,8 +476,9 @@ refresh = int(config["refresh"])
 port = int(config["port"])
 minButtonWidth = int(config.get("minButtonWidth", 300))
 #print(f"Number of columns: {number_columns}")
-
+switches = dict()
 updateSwitches()
+#print(devices)
 scheduler = BackgroundScheduler()
 updateApScheduler()
 scheduler.start()
