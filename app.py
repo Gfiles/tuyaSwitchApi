@@ -25,9 +25,10 @@ import requests #pip install requests
 import tinytuya #pip install tinytuya
 from waitress import serve #pip install waitress
 from apscheduler.schedulers.background import BackgroundScheduler #pip install apscheduler
+from threading import Thread
 
 # ---------- Start Configurations ---------- #
-VERSION = "2025.06.20"
+VERSION = "2025.06.21"
 print(f"Version: {VERSION}")
 
 template_loader = ''
@@ -435,7 +436,10 @@ def mergeDevices(dict1, dict2):
 def scanNewDevices():
     tinytuya.scan()
     logging.info("Scanning for new devices...")
-    
+
+def start_scheduler():
+    scheduler.start()
+
 # ---------- End Functions ---------- #
 
 # Get the current working
@@ -522,18 +526,19 @@ minButtonWidth = int(config.get("minButtonWidth", 300))
 #print(f"Number of columns: {number_columns}")
 switches = dict()
 updateSwitches()
+print("Finished Getting Devices")
+
 #print(devices)
 scheduler = BackgroundScheduler()
 updateApScheduler()
-scheduler.start()
+# Run the scheduler in a separate thread
+Thread(target=start_scheduler).start()
 print("Scheduler Started")
-print("Finished Getting Devices")
 
 # Call schedule_device_jobs on startup to schedule existing jobs
 #schedule_device_jobs()
 
 if __name__ == '__main__':
     print("Server Running on http://localhost")
-    logging.info("Starting Flask server on port %d", port)
     #app.run(host='0.0.0.0', port=port, debug=True)
     serve(app, host="0.0.0.0", port=port)
