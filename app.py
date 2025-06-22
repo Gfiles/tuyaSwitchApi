@@ -234,34 +234,10 @@ def schedule():
         saveConfig(config, settingsFile)
         updateApScheduler()
         return redirect("/")
+    
     # GET method: show schedules and devices
     schedules = config.get("schedules", [])
     
-    switchInfo = list()
-    for schedule in schedules:
-        for device in devices:
-            deviceNotSelected = True 
-            # run trough list of devices and get their schedules
-            for devInSchedule in schedule["devices"]:
-                if devInSchedule == device["id"]:
-                    switchInfo.append({
-                        "name": device.get("name", ""),
-                        "solution": device.get("solution", ""),
-                        "id": device.get("id", ""),
-                        "selected": True
-                    })
-                    deviceNotSelected = False
-                    break
-            if deviceNotSelected:
-                switchInfo.append({
-                        "name": device.get("name", ""),
-                        "solution": device.get("solution", ""),
-                        "id": device.get("id", ""),
-                        "selected": False
-                    })
-        schedule["switchInfo"] = switchInfo
-    #print(f"Schedules: {schedules}")
-
     return render_template("schedule.html", schedules=schedules, devices=devices, title="Schedule Configuration")
 
 # ---------- End Routing Functions ---------- #

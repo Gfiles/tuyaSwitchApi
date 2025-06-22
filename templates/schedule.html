@@ -88,11 +88,11 @@
                     <input type="time" name="schedule_time" value="{{ schedule.time }}" class="w3-input w3-border w3-margin-bottom" required pattern="[0-9]{2}:[0-9]{2}" />
                     <label>Switches:</label>
                     <select name="schedule_devices_{{ loop.index0 }}" multiple size="5" class="w3-select w3-border w3-margin-bottom" style="height: auto;">
-                        {% for device in schedule["switchInfo"] %}
-                        <option value="{{ device.id }}" 
-                            {% if device.selected %}
-                            selected
-                            {% endif %} >
+                        {% for device in devices %}
+                        <option value="{{ device.id }}"
+                            {% if device.id in schedule.devices %}
+                                selected
+                            {% endif %}>
                             {{ device.name }} - {{ device.solution }} 
                         </option>
                         {% endfor %}
