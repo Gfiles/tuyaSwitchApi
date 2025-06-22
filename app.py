@@ -126,11 +126,11 @@ def toggle_switch(pk):
                 #new_state = 1 if current_state == 0 else 0
                 if current_state:
                     switch.turn_off()
-                    logging.info(f"Switch {device["name"]} toggled to off")
+                    logging.info(f"Switch {device['name']} toggled to off")
                     device["state"] = False
                 else:
                     switch.turn_on()
-                    logging.info(f"Switch {device["name"]} toggled to on")
+                    logging.info(f"Switch {device['name']} toggled to on")
                     device["state"] = True
             except:
                 print("Sem Conexão com a Tomada")
