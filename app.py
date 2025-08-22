@@ -126,11 +126,11 @@ def toggle_switch(pk):
                 #new_state = 1 if current_state == 0 else 0
                 if current_state:
                     switch.turn_off()
-                    logging.info(f"Switch {device["name"]} toggled to off")
+                    logging.info(f"Switch {device['name']} toggled to off")
                     device["state"] = False
                 else:
                     switch.turn_on()
-                    logging.info(f"Switch {device["name"]} toggled to on")
+                    logging.info(f"Switch {device['name']} toggled to on")
                     device["state"] = True
             except:
                 print("Sem Conexão com a Tomada")
@@ -188,8 +188,8 @@ def settings():
     with open(settingsFile, "r") as infile:
         current_config = json.load(infile)
     #devices = current_config.get("devices", [])
-    # Pass devices separately and config without devices
-    config_without_devices = {k: v for k, v in current_config.items() if k != "devices"}
+    # Pass devices separately and config without devices and aschedules
+    config_without_devices = {k: v for k, v in current_config.items() if (k != "devices") and (k != "schedules")}
     return render_template("settings.html", config=config_without_devices, devices=devices, title="Settings")
 
 @app.route("/schedule", methods=["GET", "POST"])
@@ -352,6 +352,7 @@ def readConfig(settingsFile):
                 "refresh" : 5,
                 "port" : 8080,
                 "minButtonWidth": 300,
+                "schedules": [],
                 "devices": []
         }
         #print(data)
