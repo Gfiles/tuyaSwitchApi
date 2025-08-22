@@ -1,17 +1,15 @@
-"""
 # Install required libraries
- sudo apt-get install python-crypto python-pip  # for RPi, Linux
- python3 -m pip install pycryptodome            # or pycrypto or Crypto or pyaes
- python -m tinytuya scan  #scan to get list of local devices
-https://pypi.org/project/tinytuya/
-https://github.com/jasonacox/tinytuya#setup-wizard---getting-local-keys
-python -m tinytuya wizard (get device id and keys) #Run this command to get the device id and keys
-https://pimylifeup.com/raspberry-pi-flask-web-app/
-Windows:
-pyinstaller --clean --onefile --add-data "templates*;templates." --add-data "devices.json;." -n tuyaServer app.py
-Linux:
-.venv/bin/pyinstaller --clean --onefile --add-data "templates*:templates" --add-data "devices.json:." -n tuyaServer_deb app.py
-"""
+# sudo apt-get install python-crypto python-pip  # for RPi, Linux
+# python3 -m pip install pycryptodome            # or pycrypto or Crypto or pyaes
+# python -m tinytuya scan  #scan to get list of local devices
+# https://pypi.org/project/tinytuya/
+# https://github.com/jasonacox/tinytuya#setup-wizard---getting-local-keys
+# python -m tinytuya wizard (get device id and keys) #Run this command to get the device id and keys
+# https://pimylifeup.com/raspberry-pi-flask-web-app/
+# Windows:
+#  pyinstaller --clean --onefile --add-data "templates*;templates." --add-data "devices.json;." -n tuyaServer app.py
+# Linux:
+# .venv/bin/pyinstaller --clean --onefile --add-data "templates*:." --add-data "devices.json:." -n tuyaServer_deb app.py
 import logging
 from uuid import uuid4
 from flask import Flask, render_template, request, jsonify, redirect #pip install Flask
@@ -28,20 +26,21 @@ from apscheduler.schedulers.background import BackgroundScheduler #pip install a
 from threading import Thread
 
 # ---------- Start Configurations ---------- #
-VERSION = "2025.06.21"
+VERSION = "2025.08.22"
 print(f"Version: {VERSION}")
 
 template_loader = ''
 if getattr(sys, 'frozen', False):
     # for the case of running in pyInstaller's exe
     bundle_dir = sys._MEIPASS
-    template_loader = jinja2.FileSystemLoader(
-        os.path.join(bundle_dir, 'templates'))
+    #template_loader = jinja2.FileSystemLoader(os.path.join(bundle_dir, 'templates'))
 else:
     # for running locally
-    template_loader = jinja2.FileSystemLoader(searchpath="./templates")
+    #template_loader = jinja2.FileSystemLoader(searchpath="./templates")
     bundle_dir = os.path.dirname(os.path.abspath(__file__))
-
+template_folder = os.path.join(bundle_dir, 'templates')
+template_loader = jinja2.FileSystemLoader(template_folder)
+print(f"template_loader - {template_folder}")
 template_env = jinja2.Environment(loader=template_loader)
 
 app = Flask(__name__)
@@ -126,11 +125,11 @@ def toggle_switch(pk):
                 #new_state = 1 if current_state == 0 else 0
                 if current_state:
                     switch.turn_off()
-                    logging.info(f"Switch {device['name']} toggled to off")
+                    logging.info(f"Switch {device["name"]} toggled to off")
                     device["state"] = False
                 else:
                     switch.turn_on()
-                    logging.info(f"Switch {device['name']} toggled to on")
+                    logging.info(f"Switch {device["name"]} toggled to on")
                     device["state"] = True
             except:
                 print("Sem Conexão com a Tomada")
@@ -188,8 +187,8 @@ def settings():
     with open(settingsFile, "r") as infile:
         current_config = json.load(infile)
     #devices = current_config.get("devices", [])
-    # Pass devices separately and config without devices and aschedules
-    config_without_devices = {k: v for k, v in current_config.items() if (k != "devices") and (k != "schedules")}
+    # Pass devices separately and config without devices
+    config_without_devices = {k: v for k, v in current_config.items() if k != "devices"}
     return render_template("settings.html", config=config_without_devices, devices=devices, title="Settings")
 
 @app.route("/schedule", methods=["GET", "POST"])
@@ -347,12 +346,20 @@ def readConfig(settingsFile):
         with open(settingsFile) as json_file:
             data = json.load(json_file)
     else:
+        if OS == "Linux":
+            if platform.processor() == "x86_64":
+                autoUpdateURL = "https://proj.ydreams.global/ydreams/apps/tuyaServer_deb"
+            else:
+                autoUpdateURL = "https://proj.ydreams.global/ydreams/apps/tuyaServer_arm64"
+        else:
+            autoUpdateURL = "https://proj.ydreams.global/ydreams/apps/tuyaServer.exe"
         data = {
                 "title" : "Title",
                 "refresh" : 5,
                 "port" : 8080,
                 "minButtonWidth": 300,
-                "schedules": [],
+                "autoUpdate" : True,
+                "autoUpdateURL" : autoUpdateURL,
                 "devices": []
         }
         #print(data)
@@ -364,6 +371,58 @@ def readConfig(settingsFile):
         #with open(settingsFile, "w") as outfile:
             #outfile.write(json_object)
     return data
+
+def check_update(fileURL):
+    getFileDate = get_modified_date(fileURL)
+    if "An error occurred" in getFileDate or "No Last-Modified header found." in getFileDate:
+        print(getFileDate)
+        return
+    
+    newVersionDT = datetime.strptime(getFileDate, "%a, %d %b %Y %H:%M:%S %Z")
+    versionDt = datetime.strptime(VERSION, "%Y.%m.%d")
+    print(f"Current Version Date: {versionDt}")
+    print(f"New Version Date: {newVersionDT}")
+    if versionDt.date() < newVersionDT.date():
+        logging.info("Update available!")
+        print(f"Download link: {fileURL}")
+        download_and_replace(fileURL)
+    else:
+        print("You are using the latest version.")
+
+def download_and_replace(download_url):
+    exe_path = sys.argv[0]
+    tmp_path = exe_path + ".new"
+    print(f"Downloading update from {download_url}...")
+    r = requests.get(download_url, stream=True)
+    with open(tmp_path, "wb") as f:
+        shutil.copyfileobj(r.raw, f)
+    print("Download complete.")
+    # Create a batch file to replace the running exe after exit for windows
+    bat_path = exe_path + ".bat"
+    with open(bat_path, "w") as bat:
+        bat.write(f"""@echo off
+ping 127.0.0.1 -n 3 > nul
+move /Y "{tmp_path}" "{exe_path}"
+start "" "{exe_path}"
+del "%~f0"
+""")
+    print("Restarting with update...")
+    os.startfile(bat_path)
+
+    # Create a batch file to replace the running exe after exit for linux
+    if OS == "Linux":
+        bat_path = exe_path + ".sh"
+        with open(bat_path, "w") as bat:
+            bat.write(f"""#!/bin/bash
+sleep 3
+mv -f "{tmp_path}" "{exe_path}"
+"./{exe_path}"
+""")
+        os.chmod(tmp_path, 0o755)
+        print("Restarting with update...")
+        os.system(f"sh {bat_path}")
+
+    sys.exit(0)
 
 def updateSwitches():
     for device in devices:
@@ -491,6 +550,11 @@ for device in snapShotDevices:
 # Read Config File
 settingsFile = os.path.join(cwd, "appConfig.json")
 config = readConfig(settingsFile)
+
+#check if update is available
+if config.get("autoUpdate", False):
+    check_update(config["autoUpdateURL"])
+
 # merge snapShotDevicesSmall into config
 mergeDevices(config, snapShotDevicesSmall)
 saveConfig(config, settingsFile)
@@ -516,6 +580,6 @@ print("Scheduler Started")
 #schedule_device_jobs()
 
 if __name__ == '__main__':
-    print(f"Server Running on http://localhost:{port}")
+    print(f"Tuya Server Running on http://localhost:{port}")
     #app.run(host='0.0.0.0', port=port, debug=True)
     serve(app, host="0.0.0.0", port=port)
