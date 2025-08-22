@@ -10,7 +10,7 @@ https://pimylifeup.com/raspberry-pi-flask-web-app/
 Windows:
 pyinstaller --clean --onefile --add-data "templates*;templates." --add-data "devices.json;." -n tuyaServer app.py
 Linux:
-pyinstaller --clean --onefile --add-data "templates*:templates" --add-data "devices.json:." -n tuyaServer app.py
+.venv/bin/pyinstaller --clean --onefile --add-data "templates*:templates" --add-data "devices.json:." -n tuyaServer_deb app.py
 """
 import logging
 from uuid import uuid4
@@ -515,6 +515,6 @@ print("Scheduler Started")
 #schedule_device_jobs()
 
 if __name__ == '__main__':
-    print("Server Running on http://localhost")
+    print(f"Server Running on http://localhost:{port}")
     #app.run(host='0.0.0.0', port=port, debug=True)
     serve(app, host="0.0.0.0", port=port)
