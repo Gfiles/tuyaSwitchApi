@@ -15,7 +15,7 @@ from uuid import uuid4
 from flask import Flask, render_template, request, jsonify, redirect #pip install Flask
 from flask_restful import Resource, Api #pip install Flask-RESTful
 import json
-import datetime
+from datetime import datetime
 import os
 import sys
 import jinja2
@@ -533,8 +533,8 @@ if not os.path.isfile(snapShotFile):
     need_scan = True
 else:
     # Check if snapshot.json is older than 1 day
-    file_mtime = datetime.datetime.fromtimestamp(os.path.getmtime(snapShotFile))
-    if (datetime.datetime.now() - file_mtime).days >= 1:
+    file_mtime = datetime.fromtimestamp(os.path.getmtime(snapShotFile))
+    if (datetime.now() - file_mtime).days >= 1:
         print("Snapshot file is older than 1 day, scanning for devices")
         need_scan = True
 
