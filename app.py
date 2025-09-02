@@ -24,9 +24,10 @@ import tinytuya #pip install tinytuya
 from waitress import serve #pip install waitress
 from apscheduler.schedulers.background import BackgroundScheduler #pip install apscheduler
 from threading import Thread
+import platform
 
 # ---------- Start Configurations ---------- #
-VERSION = "2025.08.22"
+VERSION = "2025.09.02"
 print(f"Version: {VERSION}")
 
 template_loader = ''
@@ -372,6 +373,16 @@ def readConfig(settingsFile):
             #outfile.write(json_object)
     return data
 
+def get_modified_date(url):
+    try:
+        response = requests.head(url)  # Use HEAD request to get headers
+        if 'Last-Modified' in response.headers:
+            return response.headers['Last-Modified']
+        else:
+            return "No Last-Modified header found."
+    except requests.exceptions.RequestException as e:
+        return f"An error occurred: {e}"
+
 def check_update(fileURL):
     getFileDate = get_modified_date(fileURL)
     if "An error occurred" in getFileDate or "No Last-Modified header found." in getFileDate:
@@ -478,6 +489,7 @@ def start_scheduler():
 
 # ---------- End Functions ---------- #
 
+OS = platform.system()
 # Get the current working
 # directory (CWD)
 try:
