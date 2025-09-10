@@ -56,6 +56,10 @@
     
             <h1>{{ title }}</h1>
         </div>
+        <div class="w3-container w3-center w3-padding-16">
+            <a href="/all/on" onclick="return confirm('Are you sure you want to turn all switches on?');" class="w3-button w3-green w3-round-large">Turn All On</a>
+            <a href="/all/off" onclick="return confirm('Are you sure you want to turn all switches off?');" class="w3-button w3-red w3-round-large">Turn All Off</a>
+        </div>
         <div class="w3-flex w3-padding-16" style="flex-direction:row; gap:16px; flex-wrap:wrap; justify-content:center;">
             {% for switch in switches %}
             <button class="tuya-button

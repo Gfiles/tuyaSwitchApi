@@ -139,6 +139,28 @@ def toggle_switch(pk):
             break
     return redirect("/")
 
+@app.route("/all/<action>")
+def all_switches(action):
+    if action not in ["on", "off"]:
+        return "Invalid action", 400
+
+    for device in devices:
+        switch = switches.get(device['id'])
+        if switch:
+            try:
+                if action == "on":
+                    switch.turn_on()
+                    device["state"] = True
+                    logging.info(f"Switch {device['name']} turned on")
+                elif action == "off":
+                    switch.turn_off()
+                    device["state"] = False
+                    logging.info(f"Switch {device['name']} turned off")
+            except Exception as e:
+                logging.error(f"Error controlling switch {device['name']}: {e}")
+                device["state"] = "offline"
+    return redirect("/")
+
 @app.route("/settings", methods=["GET", "POST"])
 def settings():
     global config, devices, title, refresh, port, minButtonWidth
@@ -189,7 +211,8 @@ def settings():
         current_config = json.load(infile)
     #devices = current_config.get("devices", [])
     # Pass devices separately and config without devices
-    config_without_devices = {k: v for k, v in current_config.items() if k != "devices"}
+    #config_without_devices = {k: v for k, v in current_config.items() if k != "devices"}
+    config_without_devices = {k: v for k, v in current_config.items() if k not in ["devices", "schedules"]}
     return render_template("settings.html", config=config_without_devices, devices=devices, title="Settings")
 
 @app.route("/schedule", methods=["GET", "POST"])
