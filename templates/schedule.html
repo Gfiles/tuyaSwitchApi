@@ -38,15 +38,23 @@
                     <option value="on">On</option>
                     <option value="off">Off</option>
                 </select>
-                <label>Days (comma separated, e.g. mon,tue,wed,thu,fri,sat,sun):</label>
-                <input type="text" name="schedule_days" class="w3-input w3-border w3-margin-bottom" placeholder="mon,tue,wed" required />
+                <label>Days:</label>
+                <select name="schedule_days_${counter}" multiple size="7" class="w3-select w3-border w3-margin-bottom">
+                    <option value="mon">Monday</option>
+                    <option value="tue">Tuesday</option>
+                    <option value="wed">Wednesday</option>
+                    <option value="thu">Thursday</option>
+                    <option value="fri">Friday</option>
+                    <option value="sat">Saturday</option>
+                    <option value="sun">Sunday</option>
+                </select>
                 <label>Time (24h format HH:MM):</label>
-                <input type="time" name="schedule_time" class="w3-input w3-border w3-margin-bottom" required />
+                <input type="time" name="schedule_time" class="w3-input w3-border w3-margin-bottom" required pattern="[0-9]{2}:[0-9]{2}" />
                 <label>Switches:</label>
                 <select name="schedule_devices_${counter}" multiple size="5" class="w3-select w3-border w3-margin-bottom" style="height: auto;">
                     {% for device in devices %}
                         <option value="{{ device.id }}"> 
-                            {{ device.name }} - {{ device.solution }} 
+                            {{ device.solution }} 
                         </option>
                     {% endfor %}
                 </select>        
@@ -82,11 +90,19 @@
                         <option value="on" {% if schedule.action == 'on' %}selected{% endif %}>On</option>
                         <option value="off" {% if schedule.action == 'off' %}selected{% endif %}>Off</option>
                     </select>
-                    <label>Days (comma separated, e.g. mon,tue,wed,thu,fri,sat,sun):</label>
-                    <input type="text" name="schedule_days" value="{{ schedule.days | join(',') }}" class="w3-input w3-border w3-margin-bottom" required />
+                    <label>Days:</label>
+                    <select name="schedule_days_{{ loop.index0 }}" multiple size="7" class="w3-select w3-border w3-margin-bottom">
+                        <option value="mon" {% if 'mon' in schedule.days %}selected{% endif %}>Monday</option>
+                        <option value="tue" {% if 'tue' in schedule.days %}selected{% endif %}>Tuesday</option>
+                        <option value="wed" {% if 'wed' in schedule.days %}selected{% endif %}>Wednesday</option>
+                        <option value="thu" {% if 'thu' in schedule.days %}selected{% endif %}>Thursday</option>
+                        <option value="fri" {% if 'fri' in schedule.days %}selected{% endif %}>Friday</option>
+                        <option value="sat" {% if 'sat' in schedule.days %}selected{% endif %}>Saturday</option>
+                        <option value="sun" {% if 'sun' in schedule.days %}selected{% endif %}>Sunday</option>
+                    </select>
                     <label>Time (24h format HH:MM):</label>
                     <input type="time" name="schedule_time" value="{{ schedule.time }}" class="w3-input w3-border w3-margin-bottom" required pattern="[0-9]{2}:[0-9]{2}" />
-                    <label>Switches:</label>
+                    <label>Switches:</label> 
                     <select name="schedule_devices_{{ loop.index0 }}" multiple size="5" class="w3-select w3-border w3-margin-bottom" style="height: auto;">
                         {% for device in devices %}
                         <option value="{{ device.id }}"

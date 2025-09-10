@@ -7,7 +7,7 @@
 # python -m tinytuya wizard (get device id and keys) #Run this command to get the device id and keys
 # https://pimylifeup.com/raspberry-pi-flask-web-app/
 # Windows:
-#  pyinstaller --clean --onefile --add-data "templates*;templates." --add-data "devices.json;." -n tuyaServer app.py
+#  pyinstaller --clean --onefile --add-data "templates*;." --add-data "devices.json;." -n tuyaServer app.py
 # Linux:
 # .venv/bin/pyinstaller --clean --onefile --add-data "templates*:." --add-data "devices.json:." -n tuyaServer_deb app.py
 import logging
@@ -27,8 +27,8 @@ from threading import Thread
 import platform
 
 # ---------- Start Configurations ---------- #
-VERSION = "2025.09.02"
-print(f"Version: {VERSION}")
+VERSION = "2025.09.10"
+print(f"Switch Server Version: {VERSION}")
 
 template_loader = ''
 if getattr(sys, 'frozen', False):
@@ -232,7 +232,6 @@ def schedule():
         schedule_ids = request.form.getlist("schedule_id")
         schedule_names = request.form.getlist("schedule_name")
         schedule_actions = request.form.getlist("schedule_action")
-        schedule_days = request.form.getlist("schedule_days")
         schedule_times = request.form.getlist("schedule_time")
         deviceKeys = search_partial_key(form_data, "schedule_devices")
         #print(f"List of device Keys: {deviceKeys}")
@@ -247,7 +246,7 @@ def schedule():
                 sid = str(uuid4())
             name = schedule_names[i]
             action = schedule_actions[i].lower()
-            days = schedule_days[i].split(",") if schedule_days[i] else []
+            days = request.form.getlist(f"schedule_days_{i}")
             time_str = schedule_times[i]
             schedules.append({
                 "id": sid,
@@ -306,15 +305,18 @@ def updateApScheduler():
     scheduler.add_job(func=scanNewDevices, trigger="interval", hours=24)
 
     for schedule in config.get("schedules", []):
-        #print(f"Adding job for schedule: {schedule}")
-        scheduler.add_job(
-            func=executeSchedule,
-            trigger='cron',
-            day_of_week=','.join(schedule['days']),
-            hour=int(schedule['time'].split(':')[0]),
-            minute=int(schedule['time'].split(':')[1]),
-            args=[schedule['action'], schedule['devices']],
-        )
+        if schedule.get('days'):  # Only add job if days are specified
+            #print(f"Adding job for schedule: {schedule}")
+            scheduler.add_job(
+                func=executeSchedule,
+                trigger='cron',
+                day_of_week=','.join(schedule['days']),
+                hour=int(schedule['time'].split(':')[0]),
+                minute=int(schedule['time'].split(':')[1]),
+                args=[schedule['action'], schedule['devices']],
+            )
+        else:
+            logging.warning(f"Skipping schedule '{schedule.get('name')}' because no days are configured.")
     print("Scheduler updated with new schedules.")
     logging.info("Scheduler updated with new schedules.")
 
