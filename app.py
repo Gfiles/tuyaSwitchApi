@@ -144,7 +144,12 @@ def all_switches(action):
     if action not in ["on", "off"]:
         return "Invalid action", 400
 
+    excluded_devices = config.get("exclude_from_all", [])
+
     for device in devices:
+        if device['id'] in excluded_devices:
+            logging.info(f"Skipping device {device['name']} as it is in the exclusion list for 'all' actions.")
+            continue
         switch = switches.get(device['id'])
         if switch:
             try:
@@ -166,30 +171,32 @@ def settings():
     global config, devices, title, refresh, port, minButtonWidth
     if request.method == "POST":
         # Save the updated settings to appConfig.json
-        form_data = request.form.to_dict(flat=False)
+        form_data = request.form
         # Reconstruct config dict
         with open(settingsFile, "r") as infile:
             current_config = json.load(infile)
         # Update non-devices config keys
         for key in current_config:
-            if key != "devices":
-                if key in form_data:
-                    current_config[key] = form_data[key][0]
+            if key in form_data and key not in ["devices", "exclude_from_all"]:
+                current_config[key] = form_data[key]
+
         # Update devices list solutions
-        devices_list = current_config.get("devices", [])
+        devices_list = list(current_config.get("devices", []))
         for i, device in enumerate(devices_list):
             solution_key = f"device_solution_{i}"
             if solution_key in form_data:
-                device["solution"] = form_data[solution_key][0]
+                device["solution"] = form_data[solution_key]
                 for item in devices:
                     if item["name"] == device["name"]:
                         item["solution"] = device["solution"]
         # Update number_columns setting
         if "minButtonWidth" in form_data:
             try:
-                current_config["minButtonWidth"] = int(form_data["minButtonWidth"][0])
+                current_config["minButtonWidth"] = int(form_data["minButtonWidth"])
             except ValueError:
                 pass
+        # Update exclude_from_all list
+        current_config["exclude_from_all"] = request.form.getlist("exclude_from_all")
         current_config["devices"] = devices_list
         saveConfig(current_config, settingsFile)
         # delete
@@ -211,9 +218,8 @@ def settings():
         current_config = json.load(infile)
     #devices = current_config.get("devices", [])
     # Pass devices separately and config without devices
-    #config_without_devices = {k: v for k, v in current_config.items() if k != "devices"}
-    config_without_devices = {k: v for k, v in current_config.items() if k not in ["devices", "schedules"]}
-    return render_template("settings.html", config=config_without_devices, devices=devices, title="Settings")
+    config_for_template = {k: v for k, v in current_config.items() if k not in ["devices", "schedules"]}
+    return render_template("settings.html", config=config_for_template, devices=devices, title="Settings")
 
 @app.route("/schedule", methods=["GET", "POST"])
 def schedule():
@@ -384,6 +390,7 @@ def readConfig(settingsFile):
                 "minButtonWidth": 300,
                 "autoUpdate" : True,
                 "autoUpdateURL" : autoUpdateURL,
+                "exclude_from_all": [],
                 "devices": []
         }
         #print(data)

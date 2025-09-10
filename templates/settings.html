@@ -30,7 +30,8 @@
             /* Additional styling for form inputs and buttons */
             .w3-input {
                 max-width: 320px;
-                margin-bottom: 10px;
+                //margin-bottom: 10px;
+                margin: auto;
             }
             .w3-button {
                 min-width: 100px;
@@ -58,6 +59,11 @@
             .device-solution {
                 flex: 1;
             }
+            .exclude-list {
+                text-align: left;
+                max-width: 320px;
+                margin: auto;
+            }
         </style>
     </head>
     <body>
@@ -72,6 +78,9 @@
         <div class="w3-container w3-center w3-padding-16">
             <form method="POST" class="w3-container w3-card-4 w3-padding w3-white" style="max-width: 400px; margin: auto; border-radius: 10px;">
                 {% for key, value in config.items() %}
+                    {% if key == 'exclude_from_all' %}
+                        
+                    {% else %}
                     <label class="w3-text-teal" for="{{ key }}">{{ key }}</label>
                     <input
                         class="w3-input w3-border w3-round"
@@ -80,10 +89,25 @@
                         name="{{ key }}"
                         value="{{ value }}"
                     />
+                    {% endif %}
                 {% endfor %}
                 
                 {% if devices %}
-                    <h3>Convert Devices</h3>
+                    <label class="w3-text-teal">Exclude from 'All On/Off'</label>
+                    <div class="exclude-list">
+                        <select name="exclude_from_all" multiple size="8" class="w3-select w3-border w3-margin-bottom" style="height: auto;">
+                            {% for device in devices %}
+                                <option value="{{ device.id }}"
+                                    {% if device.id in config.get('exclude_from_all', []) %}selected{% endif %}>
+                                    {{ device.solution }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                {% endif %}
+
+                {% if devices %}
+                <label class="w3-text-teal">Device Names</label>
                     <div class="device-list">
                         {% for device in devices %}
                             <div class="device-row">
@@ -98,6 +122,8 @@
                         {% endfor %}
                     </div>
                 {% endif %}
+
+                
                 <button type="submit" class="w3-button w3-teal w3-round w3-margin-top">
                     Save
                 </button>
