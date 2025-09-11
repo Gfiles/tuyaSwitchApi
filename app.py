@@ -511,12 +511,14 @@ def updateSwitches():
             data = switch.status()["dps"]
             #print(data)
             device["state"] = data.get("1", "offline")
-            device["voltage"] = int(data.get("20", "0"))/10
+            device["voltage"] = int(data.get("20", 0))/10
+            device["power"] = int(data.get("19", 0))
         except Exception as error:
             logging.error(f"Error updating switch {device['id']}: {error}")
             switches[device['id']] = None
             device["state"] = "offline"
             device["voltage"] = 0
+            device["power"] = 0
     return redirect("/")
 
 def mergeDevices(dict1, dict2):
@@ -546,9 +548,9 @@ def mergeDevices(dict1, dict2):
                                  "ver": item2["ver"],})
 
 def scanNewDevices():
-    tinytuya.scan()
     logging.info("Scanning for new devices...")
-
+    return tinytuya.deviceScan()
+    
 def start_scheduler():
     scheduler.start()
 
@@ -603,23 +605,18 @@ else:
         print("Snapshot file is older than 1 day, scanning for devices")
         need_scan = True
 
-if need_scan:
-    scanNewDevices()
-
-snapShotJson = readConfig(snapShotFile)
-snapShotDevices = snapShotJson["devices"]
+snapShotDevices = scanNewDevices()
 
 #make small version of snapshot devices with only name
 snapShotDevicesSmall = list()
-for device in snapShotDevices:
+for key, device in snapShotDevices.items():
     if device["ip"] != "":
         toAdd = {
             "name": device["name"],
-            "solution": device["name"],
             "ip": device["ip"],
             "id": device["id"],
             "key": device["key"],
-            "ver": device["ver"]
+            "ver": device["version"]
         }
         snapShotDevicesSmall.append(toAdd)
 
