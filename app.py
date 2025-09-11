@@ -221,6 +221,39 @@ def settings():
     config_for_template = {k: v for k, v in current_config.items() if k not in ["devices", "schedules"]}
     return render_template("settings.html", config=config_for_template, devices=devices, title="Settings")
 
+@app.route("/delete_device/<device_id>")
+def delete_device(device_id):
+    global config, devices, switches
+
+    # Find and remove the device from the global 'devices' list
+    device_to_remove = next((d for d in devices if d.get('id') == device_id), None)
+    if device_to_remove:
+        devices.remove(device_to_remove)
+        logging.info(f"Removed device {device_to_remove.get('name')} from runtime list.")
+
+    # Remove from switches dictionary
+    if device_id in switches:
+        del switches[device_id]
+        logging.info(f"Removed switch {device_id} from runtime dictionary.")
+
+    # Update the configuration file
+    with open(settingsFile, "r") as infile:
+        current_config = json.load(infile)
+
+    current_config["devices"] = [d for d in current_config.get("devices", []) if d.get("id") != device_id]
+    
+    # Also remove from exclude_from_all if it's there
+    if 'exclude_from_all' in current_config and device_id in current_config['exclude_from_all']:
+        current_config['exclude_from_all'].remove(device_id)
+
+    # Also remove from any schedules
+    for schedule in current_config.get("schedules", []):
+        if device_id in schedule.get("devices", []):
+            schedule["devices"].remove(device_id)
+
+    saveConfig(current_config, settingsFile)
+    return redirect("/settings")
+
 @app.route("/schedule", methods=["GET", "POST"])
 def schedule():
     global devices, config

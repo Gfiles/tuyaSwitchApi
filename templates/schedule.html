@@ -16,8 +16,41 @@
             max-width: 400px;
             margin-bottom: 16px;
         }
+        .header-icon-left {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+        }
+        .header-icon-right {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
     </style>
     <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            checkInternetQuality();
+        });
+
+        function checkInternetQuality() {
+            const icon = document.getElementById('internet-status-icon');
+            if (!icon) return;
+
+            // Use a no-cors request to a reliable host to check connectivity.
+            // We add a random query string to prevent caching.
+            fetch('https://1.1.1.1', { mode: 'no-cors', cache: 'no-store' })
+                .then(response => {
+                    icon.className = 'fas fa-wifi';
+                    icon.style.color = 'lightgreen';
+                    icon.title = 'Internet: Connected';
+                })
+                .catch(error => {
+                    icon.className = 'fas fa-exclamation-circle';
+                    icon.style.color = 'orange';
+                    icon.title = 'Internet: Disconnected';
+                });
+        }
+
         var counter = 10;
         function addSchedule() {
             const container = document.getElementById('schedules-container');
@@ -66,8 +99,11 @@
     </script>
 </head>
 <body>
-    <div class="w3-container w3-teal w3-center">
-        <div style="position: absolute; top: 10px; left: 10px;">
+    <div class="w3-container w3-teal w3-center" style="position: relative;">
+        <div class="header-icon-left">
+            <i id="internet-status-icon" class="fas fa-spinner fa-spin" style="font-size: 24px;" title="Checking connection..."></i>
+        </div>
+        <div class="header-icon-right">
             <a href="/">
                 <i class="fas fa-home" style="font-size: 24px;"></i>
             </a>
