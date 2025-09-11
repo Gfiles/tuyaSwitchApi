@@ -1,0 +1,65 @@
+{
+    "title": "Testing",
+    "refresh": "5",
+    "port": "8080",
+    "minButtonWidth": 300,
+    "autoUpdate": "True",
+    "autoUpdateURL": "https://proj.ydreams.global/ydreams/apps/tuyaServer.exe",
+    "devices": [
+        {
+            "name": "Impressoras 3D",
+            "solution": "Teste",
+            "id": "ebec94d70e910c2ed8ivnf",
+            "ip": "192.168.0.104",
+            "key": "`$F^VH1o/v[>xnwm",
+            "ver": "3.4",
+            "state": true,
+            "voltage": 0.0
+        },
+        {
+            "name": "YDExt001",
+            "solution": "My PC",
+            "id": "ebb06a927c1e101691y87x",
+            "ip": "192.168.0.238",
+            "key": ")oiWK.=H+US)n>H5",
+            "ver": "3.4",
+            "state": true,
+            "voltage": 0.0
+        },
+        {
+            "name": "K1Max",
+            "solution": "K1Max",
+            "id": "eb0cf24beec5c28c00yibk",
+            "ip": "192.168.0.200",
+            "key": "q@Un2sk0s4zApsgm",
+            "ver": "3.4"
+        },
+        {
+            "name": "YDSw066",
+            "solution": "YDSw066",
+            "id": "ebcdf7af4289d6a2aenyxj",
+            "ip": "192.168.0.156",
+            "key": "Z:MJ@xaA42BO9.sl",
+            "ver": "3.4"
+        }
+    ],
+    "schedules": [
+        {
+            "id": "7a41d78f-42fb-4ca2-815e-3150e3f66289",
+            "name": "Off",
+            "action": "off",
+            "days": [
+                "mon",
+                "tue"
+            ],
+            "time": "17:14",
+            "devices": [
+                "ebec94d70e910c2ed8ivnf"
+            ]
+        }
+    ],
+    "exclude_from_all": [
+        "ebec94d70e910c2ed8ivnf",
+        "ebb06a927c1e101691y87x"
+    ]
+}

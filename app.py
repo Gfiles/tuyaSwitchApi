@@ -19,12 +19,14 @@ from datetime import datetime
 import os
 import sys
 import jinja2
+import sqlite3
 import requests #pip install requests
 import tinytuya #pip install tinytuya
 from waitress import serve #pip install waitress
 from apscheduler.schedulers.background import BackgroundScheduler #pip install apscheduler
 from threading import Thread
 import platform
+import shutil
 
 # ---------- Start Configurations ---------- #
 VERSION = "2025.09.10"
@@ -169,56 +171,36 @@ def all_switches(action):
 @app.route("/settings", methods=["GET", "POST"])
 def settings():
     global config, devices, title, refresh, port, minButtonWidth
+    db = get_db_conn()
+    cursor = db.cursor()
     if request.method == "POST":
-        # Save the updated settings to appConfig.json
-        form_data = request.form
-        # Reconstruct config dict
-        with open(settingsFile, "r") as infile:
-            current_config = json.load(infile)
-        # Update non-devices config keys
-        for key in current_config:
-            if key in form_data and key not in ["devices", "exclude_from_all"]:
-                current_config[key] = form_data[key]
+        # Update general settings
+        for key in ['title', 'refresh', 'port', 'minButtonWidth', 'autoUpdate', 'autoUpdateURL']:
+            if key in request.form:
+                update_setting(key, request.form[key])
 
-        # Update devices list solutions
-        devices_list = list(current_config.get("devices", []))
-        for i, device in enumerate(devices_list):
+        # Update device solutions
+        for i, device in enumerate(devices):
             solution_key = f"device_solution_{i}"
-            if solution_key in form_data:
-                device["solution"] = form_data[solution_key]
-                for item in devices:
-                    if item["name"] == device["name"]:
-                        item["solution"] = device["solution"]
-        # Update number_columns setting
-        if "minButtonWidth" in form_data:
-            try:
-                current_config["minButtonWidth"] = int(form_data["minButtonWidth"])
-            except ValueError:
-                pass
-        # Update exclude_from_all list
-        current_config["exclude_from_all"] = request.form.getlist("exclude_from_all")
-        current_config["devices"] = devices_list
-        saveConfig(current_config, settingsFile)
-        # delete
-        #with open(settingsFile, "w") as outfile:
-            #json.dump(current_config, outfile, indent=4)
+            if solution_key in request.form:
+                update_device_solution(device['id'], request.form[solution_key])
+
+        # Update 'exclude_from_all' list
+        excluded_ids = request.form.getlist("exclude_from_all")
+        cursor.execute('DELETE FROM excluded_devices')
+        for device_id in excluded_ids:
+            cursor.execute('INSERT INTO excluded_devices (device_id) VALUES (?)', (device_id,))
+        db.commit()
 
         # Reload global config variables
-        config = current_config
-        #devices = config.get("devices", [])
-        title = config.get("title", title)
-        refresh = int(config.get("refresh", refresh))
-        port = int(config.get("port", port))
-        minButtonWidth = int(current_config.get("minButtonWidth", 3))
+        load_config_from_db()
         logging.info("Settings updated successfully")
         return redirect("/")
     
     # Load current settings
-    with open(settingsFile, "r") as infile:
-        current_config = json.load(infile)
-    #devices = current_config.get("devices", [])
-    # Pass devices separately and config without devices
-    config_for_template = {k: v for k, v in current_config.items() if k not in ["devices", "schedules"]}
+    config_for_template = get_all_settings()
+    config_for_template['exclude_from_all'] = [row[0] for row in cursor.execute('SELECT device_id FROM excluded_devices').fetchall()]
+    db.close()
     return render_template("settings.html", config=config_for_template, devices=devices, title="Settings")
 
 @app.route("/delete_device/<device_id>")
@@ -236,42 +218,22 @@ def delete_device(device_id):
         del switches[device_id]
         logging.info(f"Removed switch {device_id} from runtime dictionary.")
 
-    # Update the configuration file
-    with open(settingsFile, "r") as infile:
-        current_config = json.load(infile)
-
-    current_config["devices"] = [d for d in current_config.get("devices", []) if d.get("id") != device_id]
-    
-    # Also remove from exclude_from_all if it's there
-    if 'exclude_from_all' in current_config and device_id in current_config['exclude_from_all']:
-        current_config['exclude_from_all'].remove(device_id)
-
-    # Also remove from any schedules
-    for schedule in current_config.get("schedules", []):
-        if device_id in schedule.get("devices", []):
-            schedule["devices"].remove(device_id)
-
-    saveConfig(current_config, settingsFile)
+    # Remove from database
+    db = get_db_conn()
+    db.execute('DELETE FROM devices WHERE id = ?', (device_id,))
+    db.commit()
+    db.close()
     return redirect("/settings")
 
 @app.route("/schedule", methods=["GET", "POST"])
 def schedule():
     global devices, config
     if request.method == "POST":
-        form_data = request.form.to_dict(flat=False)
-        #print(f"Form Data: {form_data}")
-        # Parse form data to update schedules and device associations
         schedules = []
         schedule_ids = request.form.getlist("schedule_id")
         schedule_names = request.form.getlist("schedule_name")
         schedule_actions = request.form.getlist("schedule_action")
         schedule_times = request.form.getlist("schedule_time")
-        deviceKeys = search_partial_key(form_data, "schedule_devices")
-        #print(f"List of device Keys: {deviceKeys}")
-        deviceList = list()
-        for key in deviceKeys:
-            deviceList.append(form_data[key])
-        #print(f"List of device List: {deviceList}")
 
         for i in range(len(schedule_ids)):
             sid = schedule_ids[i]
@@ -281,24 +243,36 @@ def schedule():
             action = schedule_actions[i].lower()
             days = request.form.getlist(f"schedule_days_{i}")
             time_str = schedule_times[i]
+            device_list = request.form.getlist(f"schedule_devices_{i}")
             schedules.append({
                 "id": sid,
                 "name": name,
                 "action": action,
                 "days": days,
                 "time": time_str,
-                "devices": deviceList[i]
+                "devices": device_list
             })
-        #config["schedules"] = schedules
-        #print(f"Updated Schedules: {schedules}")
-        config["schedules"] = schedules
-        saveConfig(config, settingsFile)
+        
+        # Save schedules to DB
+        db = get_db_conn()
+        cursor = db.cursor()
+        cursor.execute('DELETE FROM schedules')
+        cursor.execute('DELETE FROM schedule_days')
+        cursor.execute('DELETE FROM schedule_devices')
+        for s in schedules:
+            cursor.execute('INSERT INTO schedules (id, name, action, time) VALUES (?, ?, ?, ?)', (s['id'], s['name'], s['action'], s['time']))
+            for day in s['days']:
+                cursor.execute('INSERT INTO schedule_days (schedule_id, day) VALUES (?, ?)', (s['id'], day))
+            for dev_id in s['devices']:
+                cursor.execute('INSERT INTO schedule_devices (schedule_id, device_id) VALUES (?, ?)', (s['id'], dev_id))
+        db.commit()
+        db.close()
+
         updateApScheduler()
         return redirect("/")
     
     # GET method: show schedules and devices
-    schedules = config.get("schedules", [])
-    
+    schedules = get_schedules_from_db()
     return render_template("schedule.html", schedules=schedules, devices=devices, title="Schedule Configuration")
 
 # ---------- End Routing Functions ---------- #
@@ -333,23 +307,24 @@ def updateApScheduler():
     """
     scheduler.remove_all_jobs()
     # create schedluer to run every 5 minutes
-    scheduler.add_job(func=updateSwitches, trigger="interval", minutes=refresh)
+    scheduler.add_job(func=updateSwitches, trigger="interval", minutes=int(refresh))
     # create schedluer to run once a day
-    scheduler.add_job(func=scanNewDevices, trigger="interval", hours=24)
+    scheduler.add_job(func=scan_and_save_new_devices, trigger="interval", hours=1)
 
     for schedule in config.get("schedules", []):
-        if schedule.get('days'):  # Only add job if days are specified
-            #print(f"Adding job for schedule: {schedule}")
+        days_of_week = schedule.get('days')
+        if days_of_week:  # Only add job if days are specified
             scheduler.add_job(
                 func=executeSchedule,
                 trigger='cron',
-                day_of_week=','.join(schedule['days']),
+                day_of_week=','.join(days_of_week),
                 hour=int(schedule['time'].split(':')[0]),
                 minute=int(schedule['time'].split(':')[1]),
                 args=[schedule['action'], schedule['devices']],
             )
         else:
             logging.warning(f"Skipping schedule '{schedule.get('name')}' because no days are configured.")
+
     print("Scheduler updated with new schedules.")
     logging.info("Scheduler updated with new schedules.")
 
@@ -392,51 +367,145 @@ def search_partial_key(dictionary, partial_key):
     matching_keys = [key for key in dictionary.keys() if partial_key in key]
     return matching_keys
 
-def saveConfig(config, settingsFile):
-    # Serializing json
-    #sort devices by name
-    devices = sortDevicesByName(config["devices"])
-    #print(devices)
-    #print(f"Saving config:\n {config}")
-    json_object = json.dumps(config, indent=4)
-    # Writing to config.json
-    with open(settingsFile, "w") as outfile:
-        outfile.write(json_object)
-    print(f"Config saved to {settingsFile}")
-    return config
+# ---------- Database Functions ---------- #
 
-def readConfig(settingsFile):
-    
-    if os.path.isfile(settingsFile):
-        with open(settingsFile) as json_file:
-            data = json.load(json_file)
-    else:
-        if OS == "Linux":
-            if platform.processor() == "x86_64":
-                autoUpdateURL = "https://proj.ydreams.global/ydreams/apps/tuyaServer_deb"
-            else:
-                autoUpdateURL = "https://proj.ydreams.global/ydreams/apps/tuyaServer_arm64"
-        else:
-            autoUpdateURL = "https://proj.ydreams.global/ydreams/apps/tuyaServer.exe"
-        data = {
-                "title" : "Title",
-                "refresh" : 5,
-                "port" : 8080,
-                "minButtonWidth": 300,
-                "autoUpdate" : True,
-                "autoUpdateURL" : autoUpdateURL,
-                "exclude_from_all": [],
-                "devices": []
-        }
-        #print(data)
-        # Serializing json
-        #json_object = json.dumps(data, indent=4)
-        #print(json_object)
-        # Writing to config.json
-        saveConfig(data, settingsFile)
-        #with open(settingsFile, "w") as outfile:
-            #outfile.write(json_object)
-    return data
+def get_db_conn():
+    conn = sqlite3.connect(db_file)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    conn = get_db_conn()
+    cursor = conn.cursor()
+    # Settings table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+    ''')
+    # Devices table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS devices (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            solution TEXT,
+            ip TEXT,
+            key TEXT,
+            ver TEXT
+        )
+    ''')
+    # Excluded devices table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS excluded_devices (
+            device_id TEXT PRIMARY KEY,
+            FOREIGN KEY (device_id) REFERENCES devices (id) ON DELETE CASCADE
+        )
+    ''')
+    # Schedules table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS schedules (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            action TEXT,
+            time TEXT
+        )
+    ''')
+    # Schedule days mapping
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS schedule_days (
+            schedule_id TEXT,
+            day TEXT,
+            PRIMARY KEY (schedule_id, day),
+            FOREIGN KEY (schedule_id) REFERENCES schedules (id) ON DELETE CASCADE
+        )
+    ''')
+    # Schedule devices mapping
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS schedule_devices (
+            schedule_id TEXT,
+            device_id TEXT,
+            PRIMARY KEY (schedule_id, device_id),
+            FOREIGN KEY (schedule_id) REFERENCES schedules (id) ON DELETE CASCADE,
+            FOREIGN KEY (device_id) REFERENCES devices (id) ON DELETE CASCADE
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def migrate_json_to_db():
+    if not os.path.isfile(settingsFile):
+        return # No JSON file to migrate
+
+    print("Migrating data from appConfig.json to tuya.db...")
+    with open(settingsFile, 'r') as f:
+        json_config = json.load(f)
+
+    db = get_db_conn()
+    cursor = db.cursor()
+
+    # Migrate settings
+    for key, value in json_config.items():
+        if key not in ['devices', 'schedules', 'exclude_from_all']:
+            cursor.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, str(value)))
+
+    # Migrate devices
+    for device in json_config.get('devices', []):
+        cursor.execute('INSERT OR REPLACE INTO devices (id, name, solution, ip, key, ver) VALUES (?, ?, ?, ?, ?, ?)',
+                       (device['id'], device['name'], device.get('solution', device['name']), device['ip'], device['key'], device.get('ver', '3.3')))
+
+    # Migrate excluded devices
+    for device_id in json_config.get('exclude_from_all', []):
+        cursor.execute('INSERT OR REPLACE INTO excluded_devices (device_id) VALUES (?)', (device_id,))
+
+    # Migrate schedules
+    for schedule in json_config.get('schedules', []):
+        cursor.execute('INSERT OR REPLACE INTO schedules (id, name, action, time) VALUES (?, ?, ?, ?)',
+                       (schedule['id'], schedule['name'], schedule['action'], schedule['time']))
+        for day in schedule.get('days', []):
+            cursor.execute('INSERT OR REPLACE INTO schedule_days (schedule_id, day) VALUES (?, ?)', (schedule['id'], day))
+        for dev_id in schedule.get('devices', []):
+            cursor.execute('INSERT OR REPLACE INTO schedule_devices (schedule_id, device_id) VALUES (?, ?)', (schedule['id'], dev_id))
+
+    db.commit()
+    db.close()
+    # Rename old config file to prevent re-migration
+    os.rename(settingsFile, settingsFile + '.migrated')
+    print("Migration complete. Old config file renamed to appConfig.json.migrated")
+
+def get_all_settings():
+    db = get_db_conn()
+    settings_dict = {row['key']: row['value'] for row in db.execute('SELECT * FROM settings').fetchall()}
+    db.close()
+    return settings_dict
+
+def update_setting(key, value):
+    db = get_db_conn()
+    db.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, value))
+    db.commit()
+    db.close()
+
+def update_device_solution(device_id, solution):
+    db = get_db_conn()
+    db.execute('UPDATE devices SET solution = ? WHERE id = ?', (solution, device_id))
+    db.commit()
+    db.close()
+
+def get_schedules_from_db():
+    db = get_db_conn()
+    schedules_list = []
+    schedules = db.execute('SELECT * FROM schedules').fetchall()
+    for s in schedules:
+        schedule_dict = dict(s)
+        days = db.execute('SELECT day FROM schedule_days WHERE schedule_id = ?', (s['id'],)).fetchall()
+        schedule_dict['days'] = [row['day'] for row in days]
+        devices_in_schedule = db.execute('SELECT device_id FROM schedule_devices WHERE schedule_id = ?', (s['id'],)).fetchall()
+        schedule_dict['devices'] = [row['device_id'] for row in devices_in_schedule]
+        schedules_list.append(schedule_dict)
+    db.close()
+    return schedules_list
+
+# ---------- End Database Functions ---------- #
 
 def get_modified_date(url):
     try:
@@ -533,26 +602,68 @@ def mergeDevices(dict1, dict2):
     for item2 in dict2:
         deviceNotFound = True
         for item1 in dict1["devices"]:
-            if item1["id"] == item2["id"]:
-                #print(f"Device {item1['name']} already exists, skipping")
-                item1["ip"] = item2["ip"]
-                deviceNotFound = False
-                break
+            # ... (This function is now replaced by DB logic)
+            pass
         if deviceNotFound:
-            #print(f"Adding device {item2} to dict1")
-            dict1["devices"].append({"name": item2["name"],
-                                 "solution": item2["name"],
-                                 "id": item2["id"],
-                                 "ip": item2["ip"],
-                                 "key": item2["key"],
-                                 "ver": item2["ver"],})
+            # ... (This function is now replaced by DB logic)
+            pass
 
 def scanNewDevices():
     logging.info("Scanning for new devices...")
-    return tinytuya.deviceScan()
-    
+    return tinytuya.deviceScan(False, 20)
+
+def scan_and_save_new_devices():
+    """Scans for new devices and adds them to the database."""
+    logging.info("Executing scheduled scan for new devices...")
+    newly_scanned_devices = scanNewDevices()
+    if not newly_scanned_devices:
+        logging.info("No new devices found during scheduled scan.")
+        return
+
+    db = get_db_conn()
+    for key, device_data in newly_scanned_devices.items():
+        if device_data.get("ip"):
+            logging.info(f"Found device: {device_data['name']}. Adding/updating in DB.")
+            db.execute('INSERT OR IGNORE INTO devices (id, name, solution, ip, key, ver) VALUES (?, ?, ?, ?, ?, ?)',
+                       (device_data['id'], device_data['name'], device_data['name'], device_data['ip'], device_data['key'], device_data.get('version', '3.3')))
+            db.execute('UPDATE devices SET ip = ? WHERE id = ?', (device_data['ip'], device_data['id']))
+    db.commit()
+    db.close()
+    logging.info("Finished processing devices from scheduled scan.")
+
 def start_scheduler():
     scheduler.start()
+
+def load_config_from_db():
+    global config, devices, title, refresh, port, minButtonWidth
+    
+    db = get_db_conn()
+    
+    # Load settings
+    settings_from_db = {row['key']: row['value'] for row in db.execute('SELECT * FROM settings').fetchall()}
+    title = settings_from_db.get("title", "Tuya App")
+    refresh = int(settings_from_db.get("refresh", 5))
+    port = int(settings_from_db.get("port", 8080))
+    minButtonWidth = int(settings_from_db.get("minButtonWidth", 300))
+
+    # Load devices
+    devices_from_db = db.execute('SELECT * FROM devices ORDER BY solution COLLATE NOCASE').fetchall()
+    devices = [dict(row) for row in devices_from_db]
+
+    # Load schedules into a config-like dictionary for the scheduler
+    schedules = get_schedules_from_db()
+    
+    # Load excluded devices
+    excluded_from_db = db.execute('SELECT device_id FROM excluded_devices').fetchall()
+    excluded_devices = [row['device_id'] for row in excluded_from_db]
+
+    config = {
+        **settings_from_db,
+        "devices": devices,
+        "schedules": schedules,
+        "exclude_from_all": excluded_devices
+    }
+    db.close()
 
 # ---------- End Functions ---------- #
 
@@ -582,6 +693,9 @@ else:
     
 print("Current working directory:", cwd)
 #index file
+db_file = os.path.join(cwd, 'tuya.db')
+settingsFile = os.path.join(cwd, "appConfig.json")
+
 #templateFolder = os.path.join(cwd, "templates")
 
 #Create logging system anda save to log file
@@ -591,6 +705,10 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
+
+# Initialize DB and migrate if necessary
+init_db()
+migrate_json_to_db()
 
 # Read Snapshot File
 snapShotFile = os.path.join(cwd, "snapshot.json")
@@ -607,7 +725,7 @@ else:
 
 snapShotDevices = scanNewDevices()
 
-#make small version of snapshot devices with only name
+#make small version of snapshot devices with only name and ip
 snapShotDevicesSmall = list()
 for key, device in snapShotDevices.items():
     if device["ip"] != "":
@@ -621,23 +739,23 @@ for key, device in snapShotDevices.items():
         snapShotDevicesSmall.append(toAdd)
 
 #print("Devices found in snapshot:", snapShotDevicesSmall)
-# Read Config File
-settingsFile = os.path.join(cwd, "appConfig.json")
-config = readConfig(settingsFile)
+
+# Load configuration from the database
+load_config_from_db()
 
 #check if update is available
 if config.get("autoUpdate", False):
     check_update(config["autoUpdateURL"])
 
-# merge snapShotDevicesSmall into config
-mergeDevices(config, snapShotDevicesSmall)
-saveConfig(config, settingsFile)
+# merge newly scanned devices into DB
+db = get_db_conn()
+for device in snapShotDevicesSmall:
+    db.execute('INSERT OR IGNORE INTO devices (id, name, solution, ip, key, ver) VALUES (?, ?, ?, ?, ?, ?)',
+               (device['id'], device['name'], device['name'], device['ip'], device['key'], device['ver']))
+    db.execute('UPDATE devices SET ip = ? WHERE id = ?', (device['ip'], device['id']))
+db.commit()
+db.close()
 
-devices = config["devices"]
-title = config["title"]
-refresh = int(config["refresh"])
-port = int(config["port"])
-minButtonWidth = int(config.get("minButtonWidth", 300))
 #print(f"Number of columns: {number_columns}")
 switches = dict()
 updateSwitches()
