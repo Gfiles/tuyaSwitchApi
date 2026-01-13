@@ -6,6 +6,11 @@
 # https://github.com/jasonacox/tinytuya#setup-wizard---getting-local-keys
 # python -m tinytuya wizard (get device id and keys) #Run this command to get the device id and keys
 # https://pimylifeup.com/raspberry-pi-flask-web-app/
+# UV Installation:
+# Windows PowerShell:
+#   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+# Linux:
+#   curl -LsSf https://astral.sh/uv/install.sh | sh
 # Windows:
 #  pyinstaller --clean --onefile --add-data "templates*;." --add-data "devices.json;." -n tuyaServer app.py
 # Linux:
@@ -32,15 +37,25 @@ import shutil
 VERSION = "2025.09.10"
 print(f"Switch Server Version: {VERSION}")
 
+DEVICES_URL = "https://proj.ydreams.global/ydreams/apps/servers/devices.json"
+
+try:
+    this_file = __file__
+except NameError:
+    this_file = sys.argv[0]
+this_file = os.path.abspath(this_file)
+
 template_loader = ''
 if getattr(sys, 'frozen', False):
     # for the case of running in pyInstaller's exe
     bundle_dir = sys._MEIPASS
     #template_loader = jinja2.FileSystemLoader(os.path.join(bundle_dir, 'templates'))
+    cwd = os.path.dirname(sys.executable)
 else:
     # for running locally
     #template_loader = jinja2.FileSystemLoader(searchpath="./templates")
     bundle_dir = os.path.dirname(os.path.abspath(__file__))
+    cwd = os.path.dirname(this_file)
 template_folder = os.path.join(bundle_dir, 'templates')
 template_loader = jinja2.FileSystemLoader(template_folder)
 print(f"template_loader - {template_folder}")
@@ -128,11 +143,11 @@ def toggle_switch(pk):
                 #new_state = 1 if current_state == 0 else 0
                 if current_state:
                     switch.turn_off()
-                    logging.info(f"Switch {device["name"]} toggled to off")
+                    logging.info(f"Switch {device['name']} toggled to off")
                     device["state"] = False
                 else:
                     switch.turn_on()
-                    logging.info(f"Switch {device["name"]} toggled to on")
+                    logging.info(f"Switch {device['name']} toggled to on")
                     device["state"] = True
             except:
                 print("Sem Conexão com a Tomada")
@@ -665,11 +680,37 @@ def load_config_from_db():
     }
     db.close()
 
+def download_file_with_progress(url, destination_path):
+    """Downloads a file from a URL to a destination, showing a progress bar."""
+    try:
+        response = requests.get(url, stream=True)
+        response.raise_for_status()  # Raise an exception for bad status codes
+        total_size = int(response.headers.get('content-length', 0))
+        
+        with open(destination_path, 'wb') as f:
+            downloaded_size = 0
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+                downloaded_size += len(chunk)
+                done = int(50 * downloaded_size / total_size) if total_size > 0 else 0
+                sys.stdout.write(f'\r[{"#" * done}{"-" * (50 - done)}] {downloaded_size / 1048576:.2f} MB / {total_size / 1048576:.2f} MB')
+                sys.stdout.flush()
+        print(f"\nDownloaded {os.path.basename(destination_path)} successfully.")
+        return True
+    except requests.exceptions.RequestException as e:
+        print(f"\nError downloading {url}: {e}")
+        return False
+    
 # ---------- End Functions ---------- #
 
 OS = platform.system()
 # Get the current working
 # directory (CWD)
+
+#download devices.json file
+download_file_with_progress(DEVICES_URL, os.path.join(bundle_dir, "devices.json"))
+
+"""
 try:
     this_file = __file__
 except NameError:
@@ -678,6 +719,7 @@ this_file = os.path.abspath(this_file)
 if getattr(sys, 'frozen', False):
     cwd = os.path.dirname(sys.executable)
     #copy devices.json to cwd
+    
     devicesFile = os.path.join(cwd, "devices.json")
     if not os.path.isfile(devicesFile):
         devicesFileCopy = os.path.join(bundle_dir, "devices.json")
@@ -688,9 +730,11 @@ if getattr(sys, 'frozen', False):
                 data = f.read()
             with open(devicesFile, "w") as f:
                 f.write(data)
+
 else:
     cwd = os.path.dirname(this_file)
-    
+"""
+
 print("Current working directory:", cwd)
 #index file
 db_file = os.path.join(cwd, 'tuya.db')
