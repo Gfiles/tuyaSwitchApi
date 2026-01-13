@@ -34,7 +34,7 @@ import platform
 import shutil
 
 # ---------- Start Configurations ---------- #
-VERSION = "2025.09.10"
+VERSION = "2026.01.13"
 print(f"Switch Server Version: {VERSION}")
 
 DEVICES_URL = "https://proj.ydreams.global/ydreams/apps/servers/devices.json"
@@ -120,7 +120,7 @@ def index():
         switchInfo.append([
             device.get("solution", ""),
             device.get("name", ""),
-            device.get("state", False),
+            device.get("state", "offline"),
             device.get("voltage", 0),
             device.get("id", "")
         ])
@@ -209,11 +209,26 @@ def settings():
 
         # Reload global config variables
         load_config_from_db()
+        updateSwitches()
         logging.info("Settings updated successfully")
         return redirect("/")
     
     # Load current settings
     config_for_template = get_all_settings()
+
+    # Ensure essential settings are displayed even if not in DB
+    defaults = {
+        'title': title,
+        'refresh': refresh,
+        'port': port,
+        'minButtonWidth': minButtonWidth,
+        'autoUpdate': config.get('autoUpdate', 'False'),
+        'autoUpdateURL': config.get('autoUpdateURL', '')
+    }
+    for key, value in defaults.items():
+        if key not in config_for_template:
+            config_for_template[key] = value
+
     config_for_template['exclude_from_all'] = [row[0] for row in cursor.execute('SELECT device_id FROM excluded_devices').fetchall()]
     db.close()
     return render_template("settings.html", config=config_for_template, devices=devices, title="Settings")
@@ -295,24 +310,14 @@ def schedule():
 
 def getRequestInfo():
     # Get IP address
-    client_ip = request.remote_addr
-    forwarded_ip = request.headers.get('X-Forwarded-For', client_ip)
+    forwarded_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
 
     # Get browser details
     user_agent = request.user_agent.string
 
-    # Get location data
-    #response = requests.get(f"https://ipinfo.io/{forwarded_ip}/json")
-    #location_data = response.json()
-
     return {
         "IP Address": forwarded_ip,
         "Browser": user_agent
-    }
-    return {
-        "IP Address": forwarded_ip,
-        "Browser": user_agent,
-        "Location": location_data
     }
 
 def updateApScheduler():
@@ -603,7 +608,6 @@ def updateSwitches():
             device["state"] = "offline"
             device["voltage"] = 0
             device["power"] = 0
-    return redirect("/")
 
 def mergeDevices(dict1, dict2):
     """
@@ -752,8 +756,9 @@ logging.basicConfig(
 
 # Initialize DB and migrate if necessary
 init_db()
-migrate_json_to_db()
+#migrate_json_to_db()
 
+"""
 # Read Snapshot File
 snapShotFile = os.path.join(cwd, "snapshot.json")
 need_scan = False
@@ -766,7 +771,7 @@ else:
     if (datetime.now() - file_mtime).days >= 1:
         print("Snapshot file is older than 1 day, scanning for devices")
         need_scan = True
-
+"""
 snapShotDevices = scanNewDevices()
 
 #make small version of snapshot devices with only name and ip
@@ -818,4 +823,5 @@ print("Scheduler Started")
 if __name__ == '__main__':
     print(f"Tuya Server Running on http://localhost:{port}")
     #app.run(host='0.0.0.0', port=port, debug=True)
+    os.system(f"start http://localhost:{port}")
     serve(app, host="0.0.0.0", port=port)
