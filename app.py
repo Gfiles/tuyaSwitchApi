@@ -16,6 +16,7 @@
 # Linux:
 # .venv/bin/pyinstaller --clean --onefile --add-data "templates*:." --add-data "devices.json:." -n tuyaServer_deb app.py
 import logging
+import subprocess
 from uuid import uuid4
 from flask import Flask, render_template, request, jsonify, redirect #pip install Flask
 from flask_restful import Resource, Api #pip install Flask-RESTful
@@ -823,5 +824,8 @@ print("Scheduler Started")
 if __name__ == '__main__':
     print(f"Tuya Server Running on http://localhost:{port}")
     #app.run(host='0.0.0.0', port=port, debug=True)
-    os.system(f"start http://localhost:{port}")
+    if OS == "Windows":
+        os.system(f"start http://localhost:{port}")
+    else:
+        subprocess.run(["xdg-open", f"http://localhost:{port}"], stderr=subprocess.DEVNULL)
     serve(app, host="0.0.0.0", port=port)
