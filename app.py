@@ -35,7 +35,7 @@ import platform
 import shutil
 
 # ---------- Start Configurations ---------- #
-VERSION = "2026.01.13"
+VERSION = "2026.01.16"
 print(f"Switch Server Version: {VERSION}")
 
 DEVICES_URL = "https://proj.ydreams.global/ydreams/apps/servers/devices.json"
@@ -713,7 +713,7 @@ OS = platform.system()
 # directory (CWD)
 
 #download devices.json file
-download_file_with_progress(DEVICES_URL, os.path.join(bundle_dir, "devices.json"))
+download_file_with_progress(DEVICES_URL, os.path.join(cwd, "devices.json"))
 
 """
 try:
