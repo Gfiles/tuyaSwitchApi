@@ -33,6 +33,8 @@ from apscheduler.schedulers.background import BackgroundScheduler #pip install a
 from threading import Thread
 import platform
 import shutil
+import webbrowser
+import time
 
 # ---------- Start Configurations ---------- #
 VERSION = "2026.01.16"
@@ -794,8 +796,9 @@ for key, device in snapShotDevices.items():
 load_config_from_db()
 
 #check if update is available
-if config.get("autoUpdate", False):
-    check_update(config["autoUpdateURL"])
+if str(config.get("autoUpdate", "False")).lower() == "true":
+    if config.get("autoUpdateURL"):
+        check_update(config["autoUpdateURL"])
 
 # merge newly scanned devices into DB
 db = get_db_conn()
@@ -824,8 +827,10 @@ print("Scheduler Started")
 if __name__ == '__main__':
     print(f"Tuya Server Running on http://localhost:{port}")
     #app.run(host='0.0.0.0', port=port, debug=True)
-    if OS == "Windows":
-        os.system(f"start http://localhost:{port}")
-    else:
-        subprocess.run(["xdg-open", f"http://localhost:{port}"], stderr=subprocess.DEVNULL)
+
+    def open_browser():
+        time.sleep(1)
+        webbrowser.open(f"http://localhost:{port}")
+
+    Thread(target=open_browser).start()
     serve(app, host="0.0.0.0", port=port)
