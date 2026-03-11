@@ -36,19 +36,33 @@ class HomeAssistantClient:
             
             # For Tuya devices, these metrics are usually split into separate `sensor` entities
             # e.g. switch.yd_switch_1 -> sensor.yd_switch_1_voltage
+            # For multi-relay switches like switch.tz3000_..._2, it usually maps to sensor.tz3000_..._voltage_2
             domain = entity_id.split('.')[0]
             if domain in ('switch', 'light'):
                 basename = entity_id.split('.')[1]
                 
+                # Check if it ends with an underscore and a number
+                import re
+                match = re.search(r'_(\d+)$', basename)
+                if match:
+                    index = match.group(1)
+                    base_without_index = basename[:-len(match.group(0))]
+                    sensor_suffix_format = "{suffix}_{index}"
+                else:
+                    base_without_index = basename
+                    index = ""
+                    sensor_suffix_format = "{suffix}"
+                
                 # Helper function to fetch a related sensor value
                 def fetch_sensor(suffix):
                     try:
-                        sensor_url = self._get_api_url(f"/states/sensor.{basename}_{suffix}")
+                        suffix_part = sensor_suffix_format.format(suffix=suffix, index=index)
+                        sensor_url = self._get_api_url(f"/states/sensor.{base_without_index}_{suffix_part}")
                         res = requests.get(sensor_url, headers=self.headers, timeout=2)
                         if res.status_code == 200:
                             return float(res.json().get('state', 0))
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logging.debug(f"Failed to fetch sensor {suffix} for {entity_id}: {e}")
                     return None
 
                 vol_sensor = fetch_sensor('voltage')

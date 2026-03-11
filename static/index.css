@@ -47,6 +47,7 @@ header h1 {
     font-weight: 700;
     background: linear-gradient(to right, var(--primary), var(--secondary));
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
     text-align: center;
 }
@@ -148,6 +149,15 @@ header h1 {
 
 .off .toggle-btn {
     background: var(--danger);
+    color: white;
+}
+
+.device-card.on.zero-power {
+    border-color: #f59e0b;
+}
+
+.device-card.on.zero-power .toggle-btn {
+    background: #f59e0b;
     color: white;
 }
 

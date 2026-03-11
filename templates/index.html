@@ -31,7 +31,8 @@
         <div class="device-grid">
             {% for switch in switches %}
             <div class="device-card 
-                {% if switch.state == 'offline' %}offline{% elif switch.state %}on{% else %}off{% endif %}"
+                {% if switch.state == 'offline' %}offline{% elif switch.state %}on{% else %}off{% endif %}
+                {% if switch.power == 0 %}zero-power{% endif %}"
                 data-device-id="{{ switch.id }}"
                 onclick="window.location.href='{{ url_for('web.toggle', pk=switch.id) }}'">
                 
@@ -103,6 +104,11 @@
                             stateText = 'OFF';
                         } else {
                             card.classList.add('offline');
+                        }
+                        
+                        card.classList.remove('zero-power');
+                        if (data.power === 0) {
+                            card.classList.add('zero-power');
                         }
                         
                         // Update text values
