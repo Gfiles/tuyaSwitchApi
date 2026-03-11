@@ -24,15 +24,20 @@ class TuyaDatabase:
                     value TEXT
                 )
             ''')
+            # Legacy fields check for migration
+            columns = [info['name'] for info in cursor.execute('PRAGMA table_info(devices)').fetchall()]
+            if 'ip' in columns:
+                cursor.execute('DROP TABLE devices')
+                cursor.execute('DROP TABLE IF EXISTS excluded_devices')
+                cursor.execute('DROP TABLE IF EXISTS schedule_devices')
+
             # Devices table
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS devices (
                     id TEXT PRIMARY KEY,
                     name TEXT,
                     solution TEXT,
-                    ip TEXT,
-                    key TEXT,
-                    ver TEXT
+                    domain TEXT
                 )
             ''')
             # Excluded devices table
@@ -139,8 +144,8 @@ class TuyaDatabase:
     def upsert_scanned_devices(self, scanned_devices):
         with self.get_connection() as conn:
             for _, dev in scanned_devices.items():
-                if dev.get('ip'):
-                    conn.execute('INSERT OR IGNORE INTO devices (id, name, solution, ip, key, ver) VALUES (?, ?, ?, ?, ?, ?)',
-                                (dev['id'], dev['name'], dev['name'], dev['ip'], dev['key'], dev.get('version', '3.3')))
-                    conn.execute('UPDATE devices SET ip = ? WHERE id = ?', (dev['ip'], dev['id']))
+                if dev.get('id'):
+                    conn.execute('INSERT OR IGNORE INTO devices (id, name, solution, domain) VALUES (?, ?, ?, ?)',
+                                (dev['id'], dev['name'], dev['name'], dev['domain']))
+                    conn.execute('UPDATE devices SET name = ?, domain = ? WHERE id = ?', (dev['name'], dev['domain'], dev['id']))
             conn.commit()

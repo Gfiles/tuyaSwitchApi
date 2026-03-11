@@ -3,14 +3,19 @@ import logging
 from flask import Flask
 from apscheduler.schedulers.background import BackgroundScheduler
 from .models import TuyaDatabase
-from .client import TuyaClient
+from .client import HomeAssistantClient
 
 class TuyaServer:
     def __init__(self, root_dir):
         self.root_dir = root_dir
         self.db_path = os.path.join(root_dir, 'tuya.db')
         self.db = TuyaDatabase(self.db_path)
-        self.client = TuyaClient()
+        
+        settings = self.db.get_settings()
+        ha_url = settings.get('ha_url', 'http://homeassistant.local:8123')
+        ha_token = settings.get('ha_token', '')
+        
+        self.client = HomeAssistantClient(ha_url, ha_token)
         self.scheduler = BackgroundScheduler()
         self.app = Flask(__name__, 
                          template_folder=os.path.join(root_dir, 'templates'),
@@ -19,7 +24,7 @@ class TuyaServer:
     def setup(self):
         # Configure app
         self.app.config['DB'] = self.db
-        self.app.config['TUYA_CLIENT'] = self.client
+        self.app.config['HA_CLIENT'] = self.client
         self.app.config['ROOT_DIR'] = self.root_dir
         self.app.config['SCHEDULER_UPDATE_FUNC'] = self.update_scheduler
         
@@ -48,11 +53,18 @@ class TuyaServer:
             format='%(asctime)s - %(levelname)s - %(message)s'
         )
         
+        self.scan_and_save_devices()
         self.setup_scheduler()
 
     def setup_scheduler(self):
         self.scheduler.start()
         self.update_scheduler()
+
+    def scan_and_save_devices(self):
+        devices = self.client.scan_devices()
+        if devices:
+            self.db.upsert_scanned_devices(devices)
+            logging.info(f"Saved {len(devices)} devices to database.")
 
     def update_scheduler(self):
         self.scheduler.remove_all_jobs()
@@ -61,7 +73,7 @@ class TuyaServer:
         
         # Core update jobs
         self.scheduler.add_job(
-            func=self.client.scan_devices, 
+            func=self.scan_and_save_devices, 
             trigger="interval", 
             hours=1,
             id="scan_devices"

@@ -7,7 +7,7 @@ web_bp = Blueprint('web', __name__)
 @web_bp.route("/")
 def index():
     db = current_app.config['DB']
-    client = current_app.config['TUYA_CLIENT']
+    client = current_app.config['HA_CLIENT']
     
     devices = db.get_devices()
     # Update status for each device (could be slow, consider caching)
@@ -16,6 +16,7 @@ def index():
         device['state'] = status['state']
         device['voltage'] = status['voltage']
         device['power'] = status['power']
+        device['current'] = status.get('current', 0)
         
     title = db.get_settings().get('title', 'Tuya App')
     min_width = db.get_settings().get('minButtonWidth', 300)
@@ -25,7 +26,7 @@ def index():
 @web_bp.route("/toggle/<pk>")
 def toggle(pk):
     db = current_app.config['DB']
-    client = current_app.config['TUYA_CLIENT']
+    client = current_app.config['HA_CLIENT']
     
     devices = db.get_devices()
     device_data = next((d for d in devices if d['id'] == pk), None)
@@ -35,12 +36,32 @@ def toggle(pk):
         
     return redirect(url_for('web.index'))
 
+@web_bp.route("/all/<action>")
+def toggle_all(action):
+    db = current_app.config['DB']
+    client = current_app.config['HA_CLIENT']
+    
+    if action not in ['on', 'off']:
+        return redirect(url_for('web.index'))
+        
+    devices = db.get_devices()
+    excluded = db.get_excluded_devices()
+    
+    for device in devices:
+        if device['id'] not in excluded:
+            if action == 'on':
+                client.turn_on(device)
+            elif action == 'off':
+                client.turn_off(device)
+                
+    return redirect(url_for('web.index'))
+
 @web_bp.route("/settings", methods=["GET", "POST"])
 def settings():
     db = current_app.config['DB']
     if request.method == "POST":
         # Update settings
-        for key in ['title', 'refresh', 'port', 'minButtonWidth', 'autoUpdate', 'autoUpdateURL']:
+        for key in ['title', 'refresh', 'port', 'minButtonWidth', 'ha_url', 'ha_token']:
             if key in request.form:
                 db.update_setting(key, request.form[key])
         
@@ -61,6 +82,8 @@ def settings():
     devices = db.get_devices()
     excluded = db.get_excluded_devices()
     config['exclude_from_all'] = excluded
+    config.setdefault('ha_url', 'http://homeassistant.local:8123')
+    config.setdefault('ha_token', '')
     
     return render_template("settings.html", config=config, devices=devices, title="Settings")
 

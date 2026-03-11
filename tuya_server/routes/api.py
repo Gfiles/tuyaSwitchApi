@@ -8,7 +8,7 @@ api = Api(api_bp)
 class DeviceStatus(Resource):
     def get(self, pk):
         db = current_app.config['DB']
-        client = current_app.config['TUYA_CLIENT']
+        client = current_app.config['HA_CLIENT']
         
         # Get device info from DB
         devices = db.get_devices()
@@ -22,14 +22,15 @@ class DeviceStatus(Resource):
             "name": device_data['name'],
             "status": "On" if status['state'] is True else "Off" if status['state'] is False else "Offline",
             "voltage": status['voltage'],
-            "power": status['power']
+            "power": status['power'],
+            "current": status.get('current', 0)
         }
 
 class DeviceOn(Resource):
     @require_api_key
     def get(self, pk):
         db = current_app.config['DB']
-        client = current_app.config['TUYA_CLIENT']
+        client = current_app.config['HA_CLIENT']
         
         devices = db.get_devices()
         device_data = next((d for d in devices if d['id'] == pk), None)
@@ -45,7 +46,7 @@ class DeviceOff(Resource):
     @require_api_key
     def get(self, pk):
         db = current_app.config['DB']
-        client = current_app.config['TUYA_CLIENT']
+        client = current_app.config['HA_CLIENT']
         
         devices = db.get_devices()
         device_data = next((d for d in devices if d['id'] == pk), None)
