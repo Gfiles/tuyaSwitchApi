@@ -1,113 +1,75 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <meta http-equiv="refresh" content="60">
-        <link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
-        <title>{{ title }} - Switches</title>
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-        <style>
-            
-            .tuya-button {
-                flex-basis: {{ minButtonWidth }}px;
-                text-align: center;
-                padding: 0.75em;
-                border: 1px solid #ccc;
-                border-radius: 50px;
-                cursor:pointer;
-                /* Other button styles */
-            }
-            
-            .button:hover {
-                background-color: #3e8e41;  
-            }
-            .btn-off {
-                opacity: 0.6;
-                cursor: not-allowed;
-            }
-            .header-icon-left {
-                position: absolute;
-                top: 10px;
-                left: 10px;
-            }
-            .header-icon-right {
-                position: absolute;
-                top: 10px;
-                right: 10px;
-                display: flex;
-                gap: 15px;
-            }
-        </style>
-        <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                checkInternetQuality();
-            });
-
-            function checkInternetQuality() {
-                const icon = document.getElementById('internet-status-icon');
-                if (!icon) return;
-
-                // Use a no-cors request to a reliable host to check connectivity.
-                // We add a random query string to prevent caching.
-                fetch('https://1.1.1.1', { mode: 'no-cors', cache: 'no-store' })
-                    .then(response => {
-                        icon.className = 'fas fa-wifi';
-                        icon.style.color = 'lightgreen';
-                        icon.title = 'Internet: Connected';
-                    })
-                    .catch(error => {
-                        icon.className = 'fas fa-exclamation-circle';
-                        icon.style.color = 'red';
-                        icon.title = 'Internet: Disconnected';
-                    });
-            }
-
-            function toggleSwitch(device_id) {
-                if (confirm("Are you sure you want to toggle this switch?")) {
-                    window.location.href = "/toggle/" + device_id;
-                }
-            }
-        </script>
-    </head>
-    <body>
-        
-        <div class="w3-container w3-teal w3-center" style="position: relative;">
-            <div class="header-icon-left">
-                <i id="internet-status-icon" class="fas fa-spinner fa-spin" style="font-size: 24px;" title="Checking connection..."></i>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="300">
+    <title>{{ title }} - Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='index.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header>
+        <div class="container" style="display: flex; justify-content: space-between; align-items: center;">
+            <div id="internet-status" style="width: 40px; text-align: left;">
+                <i id="internet-icon" class="fas fa-wifi" style="color: var(--text-dim);"></i>
             </div>
-            <div class="header-icon-right">
-                <a href="/settings" title="Settings">
-                    <i class="fas fa-cog" style="font-size: 24px;"></i>
-                </a>
-                <a href="/schedule" title="Schedule">
-                    <i class="fas fa-calendar-alt" style="font-size: 24px;"></i>
-                </a>
-            </div>
-    
             <h1>{{ title }}</h1>
+            <div style="display: flex; gap: 1rem; width: 40px; justify-content: flex-end;">
+                <a href="{{ url_for('web.schedule') }}" style="color: var(--text-main);"><i class="fas fa-calendar-alt"></i></a>
+                <a href="{{ url_for('web.settings') }}" style="color: var(--text-main);"><i class="fas fa-cog"></i></a>
+            </div>
         </div>
-        <div class="w3-container w3-center w3-padding-16">
-            <a href="/all/on" onclick="return confirm('Are you sure you want to turn all switches on?');" class="w3-button w3-green w3-round-large">Turn All On</a>
-            <a href="/all/off" onclick="return confirm('Are you sure you want to turn all switches off?');" class="w3-button w3-red w3-round-large">Turn All Off</a>
+    </header>
+
+    <main class="container">
+        <div style="display: flex; gap: 1rem; margin-bottom: 2rem; justify-content: center;">
+            <a href="/all/on" class="toggle-btn" style="background: var(--success); width: auto; padding: 0.75rem 2rem;">All On</a>
+            <a href="/all/off" class="toggle-btn" style="background: var(--danger); width: auto; padding: 0.75rem 2rem;">All Off</a>
         </div>
-        <div class="w3-flex w3-padding-16" style="flex-direction:row; gap:16px; flex-wrap:wrap; justify-content:center;">
+
+        <div class="device-grid">
             {% for switch in switches %}
-            <button class="tuya-button
-            {% if switch[2] == 'offline' %} 
-                w3-gray btn-off
-            {% elif switch[2] %} 
-                w3-green 
-            {% else %}
-                w3-red 
-            {% endif %}
-            " onclick="toggleSwitch('{{ switch[4] }}')">
-                <h2>{{ switch[0] }}</h2>
-                <h4>{{ switch[1] }}</h4>
-                {{ switch[3] }} V
-            </button>
+            <div class="device-card 
+                {% if switch.state == 'offline' %}offline{% elif switch.state %}on{% else %}off{% endif %}"
+                onclick="window.location.href='{{ url_for('web.toggle', pk=switch.id) }}'">
+                
+                <div class="device-info">
+                    <p class="device-solution">{{ switch.solution }}</p>
+                    <p class="device-name">{{ switch.name }}</p>
+                </div>
+                
+                <div class="device-stats">
+                    <div class="stat-item">
+                        <i class="fas fa-bolt"></i>
+                        <span>{{ switch.voltage }}V</span>
+                    </div>
+                </div>
+
+                <div style="margin-top: 1.5rem;">
+                    <button class="toggle-btn">
+                        {% if switch.state == 'offline' %}Offline{% elif switch.state %}ON{% else %}OFF{% endif %}
+                    </button>
+                </div>
+            </div>
             {% endfor %}
         </div>
-        
-    </body>
+    </main>
+
+    <script>
+        // Simple connectivity check
+        function updateStatus() {
+            fetch('https://1.1.1.1', { mode: 'no-cors', cache: 'no-store' })
+                .then(() => {
+                    document.getElementById('internet-icon').style.color = '#10b981';
+                })
+                .catch(() => {
+                    document.getElementById('internet-icon').style.color = '#ef4444';
+                });
+        }
+        setInterval(updateStatus, 30000);
+        updateStatus();
+    </script>
+</body>
 </html>

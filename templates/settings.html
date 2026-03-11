@@ -1,177 +1,127 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>{{ title }}</title>
-        <link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
-        <link
-            rel="stylesheet"
-            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
-        />
-        <style>
-            .tuya-button {
-                margin: 10px;
-                min-width: 320px;
-                max-width: 320px;
-                text-align: center;
-                padding: 0.75em;
-                border: 1px solid #ccc;
-                border-radius: 50px;
-                cursor: pointer;
-            }
-            .button:hover {
-                background-color: #3e8e41;
-            }
-            .btn-off {
-                opacity: 0.6;
-                cursor: not-allowed;
-            }
-            /* Additional styling for form inputs and buttons */
-            .w3-input {
-                max-width: 90%;
-                margin: auto;
-            }
-            .w3-button {
-                min-width: 100px;
-                border-radius: 50px;
-            }
-            .device-list {
-                max-width: 90%;
-                margin: auto;
-                border-radius: 10px;
-            }
-            .device-row {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 10px;
-            }
-            .device-name {
-                flex: 1;
-                padding: 8px;
-                max-width: 20%;
-                background-color: #f1f1f1;
-                border-radius: 5px;
-                margin-right: 10px;
-                user-select: none;
-            }
-            .device-solution {
-                flex: 1;
-            }
-            .delete-btn {
-                min-width: 50px;
-                margin: 10px;
-            }
-            .exclude-list {
-                text-align: left;
-                max-width: 90%;
-                margin: auto;
-            }
-            .header-icon-left {
-                position: absolute;
-                top: 10px;
-                left: 10px;
-            }
-            .header-icon-right {
-                position: absolute;
-                top: 10px;
-                right: 10px;
-            }
-        </style>
-        <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                checkInternetQuality();
-            });
 
-            function checkInternetQuality() {
-                const icon = document.getElementById('internet-status-icon');
-                if (!icon) return;
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - {{ title }}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='index.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        .settings-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
 
-                // Use a no-cors request to a reliable host to check connectivity.
-                // We add a random query string to prevent caching.
-                fetch('https://1.1.1.1', { mode: 'no-cors', cache: 'no-store' })
-                    .then(response => {
-                        icon.className = 'fas fa-wifi';
-                        icon.style.color = 'lightgreen';
-                        icon.title = 'Internet: Connected';
-                    })
-                    .catch(error => {
-                        icon.className = 'fas fa-exclamation-circle';
-                        icon.style.color = 'red';
-                        icon.title = 'Internet: Disconnected';
-                    });
-            }
-        </script>
-    </head>
-    <body>
-        <div class="w3-container w3-teal w3-center" style="position: relative;">
-            <div class="header-icon-left">
-                <i id="internet-status-icon" class="fas fa-spinner fa-spin" style="font-size: 24px;" title="Checking connection..."></i>
+        .form-group {
+            margin-bottom: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .form-group label {
+            font-size: 0.875rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .device-row {
+            display: grid;
+            grid-template-columns: 1fr 2fr auto;
+            gap: 1rem;
+            align-items: center;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            margin-bottom: 0.75rem;
+        }
+
+        select[multiple] {
+            height: 150px !important;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="container" style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="width: 40px;"></div>
+            <h1>Settings</h1>
+            <div style="width: 40px; text-align: right;">
+                <a href="{{ url_for('web.index') }}" style="color: var(--text-main);"><i class="fas fa-home"></i></a>
             </div>
-            <div class="header-icon-right">
-                <a href="/">
-                    <i class="fas fa-home" style="font-size: 24px;"></i>
-                </a>
-            </div>
-            <h1>{{ title }}</h1>
         </div>
-        <div class="w3-container w3-center w3-padding-16">
-            <form method="POST" class="w3-container w3-card-4 w3-padding w3-white" style="max-width: 90%; margin: auto; border-radius: 10px;">
-                {% for key, value in config.items() %}
-                    {% if key == 'exclude_from_all' %}
-                        
-                    {% else %}
-                    <label class="w3-text-teal" for="{{ key }}">{{ key }}</label>
-                    <input
-                        class="w3-input w3-border w3-round"
-                        type="text"
-                        id="{{ key }}"
-                        name="{{ key }}"
-                        value="{{ value }}"
-                    />
-                    {% endif %}
+    </header>
+
+    <main class="container">
+        <form method="POST" class="settings-card">
+            <h3 style="margin-bottom: 1.5rem; color: var(--primary);">General Configuration</h3>
+
+            {% for key, value in config.items() %}
+            {% if key not in ['devices', 'schedules', 'exclude_from_all', 'api_key'] %}
+            <div class="form-group">
+                <label for="{{ key }}">{{ key|replace('_', ' ')|title }}</label>
+                <input type="text" id="{{ key }}" name="{{ key }}" value="{{ value }}">
+            </div>
+            {% endif %}
+            {% endfor %}
+
+            <div class="form-group">
+                <label>API Key (For External Access)</label>
+                <div style="display: flex; gap: 1rem;">
+                    <input type="text" value="{{ config.get('api_key', 'Not Set') }}" readonly
+                        style="flex-grow: 1; opacity: 0.7;">
+                    <button type="button" class="toggle-btn" style="width: auto; padding: 0 1rem;"
+                        onclick="navigator.clipboard.writeText('{{ config.get('api_key') }}').then(() => alert('Copied!'))">Copy</button>
+                </div>
+            </div>
+
+            <h3 style="margin-bottom: 1.5rem; color: var(--primary); margin-top: 2rem;">Device Management</h3>
+            {% if devices %}
+            <div class="form-group">
+                <label>Exclude from "All On/Off"</label>
+                <select name="exclude_from_all" multiple>
+                    {% for device in devices %}
+                    <option value="{{ device.id }}" {% if device.id in config.get('exclude_from_all', []) %}selected{%
+                        endif %}>
+                        {{ device.solution }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <label style="font-size: 0.875rem; color: var(--text-dim); text-transform: uppercase;">Alias
+                Configuration</label>
+            <div style="margin-top: 1rem;">
+                {% for device in devices %}
+                <div class="device-row">
+                    <span style="font-size: 0.875rem; color: var(--text-dim);">{{ device.name }}</span>
+                    <input type="text" name="device_solution_{{ loop.index0 }}" value="{{ device.solution }}"
+                        style="margin-bottom: 0 !important;">
+                    <a href="{{ url_for('web.delete_device', pk=device.id) }}" class="toggle-btn"
+                        style="background: var(--danger); width: 40px;" onclick="return confirm('Delete device?')">
+                        <i class="fas fa-trash"></i>
+                    </a>
+                </div>
                 {% endfor %}
-                
-                {% if devices %}
-                    <label class="w3-text-teal">Exclude from 'All On/Off'</label>
-                    <div class="exclude-list">
-                        <select name="exclude_from_all" multiple size="8" class="w3-select w3-border w3-margin-bottom" style="height: auto;">
-                            {% for device in devices %}
-                                <option value="{{ device.id }}"
-                                    {% if device.id in config.get('exclude_from_all', []) %}selected{% endif %}>
-                                    {{ device.solution }}
-                                </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                {% endif %}
+            </div>
+            {% endif %}
 
-                {% if devices %}
-                <label class="w3-text-teal">Device Names</label>
-                    <div class="device-list">
-                        {% for device in devices %}
-                            <div class="device-row">
-                                <div class="device-name">{{ device.name }}</div>
-                                <input
-                                    class="w3-input w3-border w3-round device-solution"
-                                    type="text"
-                                    name="device_solution_{{ loop.index0 }}"
-                                    value="{{ device.solution }}"
-                                />
-                                <a href="/delete_device/{{ device.id }}" class="w3-button w3-red w3-round delete-btn" onclick="return confirm('Are you sure you want to delete this device? It will be removed from all schedules and exclusions.');">
-                                    <i class="fas fa-trash"></i>
-                                </a>
-                            </div>
-                        {% endfor %}
-                    </div>
-                {% endif %}
-
-                
-                <button type="submit" class="w3-button w3-teal w3-round w3-margin-top">
-                    Save
+            <div style="margin-top: 2rem; display: flex; justify-content: center;">
+                <button type="submit" class="toggle-btn"
+                    style="background: linear-gradient(to right, var(--primary), var(--secondary)); color: white; width: auto; padding: 1rem 4rem;">
+                    Save All Changes
                 </button>
-            </form>
-        </div>
-    </body>
+            </div>
+        </form>
+    </main>
+</body>
+
 </html>

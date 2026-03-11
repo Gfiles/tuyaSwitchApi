@@ -1,163 +1,160 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Schedule Configuration</title>
-    <link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schedule - {{ title }}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='index.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        .grid-container {
+        .schedule-grid {
             display: grid;
-            grid-gap: 20px;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
         }
-        .w3-card {
-            max-width: 400px;
-            margin-bottom: 16px;
+
+        .schedule-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 1.5rem;
         }
-        .header-icon-left {
-            position: absolute;
-            top: 10px;
-            left: 10px;
+
+        .form-group {
+            margin-bottom: 1rem;
         }
-        .header-icon-right {
-            position: absolute;
-            top: 10px;
-            right: 10px;
+
+        .form-group label {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        select[multiple] {
+            height: 100px !important;
         }
     </style>
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            checkInternetQuality();
-        });
-
-        function checkInternetQuality() {
-            const icon = document.getElementById('internet-status-icon');
-            if (!icon) return;
-
-            // Use a no-cors request to a reliable host to check connectivity.
-            // We add a random query string to prevent caching.
-            fetch('https://1.1.1.1', { mode: 'no-cors', cache: 'no-store' })
-                .then(response => {
-                    icon.className = 'fas fa-wifi';
-                    icon.style.color = 'lightgreen';
-                    icon.title = 'Internet: Connected';
-                })
-                .catch(error => {
-                    icon.className = 'fas fa-exclamation-circle';
-                    icon.style.color = 'red';
-                    icon.title = 'Internet: Disconnected';
-                });
-        }
-
-        var counter = 10;
+        let counter = {{ schedules| length }};
         function addSchedule() {
             const container = document.getElementById('schedules-container');
-            const index = container.children.length;
-            counter++;
-            const scheduleDiv = document.createElement('div');
-            scheduleDiv.className = 'w3-card w3-padding w3-sand';
-            scheduleDiv.style.maxWidth = '400px';
-            scheduleDiv.style.marginBottom = '16px';
-
-            scheduleDiv.innerHTML = `
-                <input type="hidden" name="schedule_id" value="" />
-                <label>Name:</label>
-                <input type="text" name="schedule_name" class="w3-input w3-border w3-margin-bottom" placeholder="Schedule Name" required />
-                <label>Action:</label>
-                <select name="schedule_action" class="w3-select w3-border w3-margin-bottom" required>
-                    <option value="" disabled selected>Select action</option>
-                    <option value="on">On</option>
-                    <option value="off">Off</option>
-                </select>
-                <label>Days:</label>
-                <select name="schedule_days_${counter}" multiple size="7" class="w3-select w3-border w3-margin-bottom">
-                    <option value="mon">Monday</option>
-                    <option value="tue">Tuesday</option>
-                    <option value="wed">Wednesday</option>
-                    <option value="thu">Thursday</option>
-                    <option value="fri">Friday</option>
-                    <option value="sat">Saturday</option>
-                    <option value="sun">Sunday</option>
-                </select>
-                <label>Time (24h format HH:MM):</label>
-                <input type="time" name="schedule_time" class="w3-input w3-border w3-margin-bottom" required pattern="[0-9]{2}:[0-9]{2}" />
-                <label>Switches:</label>
-                <select name="schedule_devices_${counter}" multiple size="5" class="w3-select w3-border w3-margin-bottom" style="height: auto;">
-                    {% for device in devices %}
-                        <option value="{{ device.id }}"> 
-                            {{ device.solution }} 
-                        </option>
-                    {% endfor %}
-                </select>        
-                <button type="button" class="w3-button w3-red" onclick="this.parentElement.remove()">Remove</button>
+            const div = document.createElement('div');
+            div.className = 'schedule-card';
+            div.innerHTML = `
+                <input type="hidden" name="schedule_id" value="">
+                <div class="form-group">
+                    <label>Schedule Name</label>
+                    <input type="text" name="schedule_name" required placeholder="Daily On">
+                </div>
+                <div class="form-group">
+                    <label>Action</label>
+                    <select name="schedule_action" required>
+                        <option value="on">Turn ON</option>
+                        <option value="off">Turn OFF</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Days</label>
+                    <select name="schedule_days_${counter}" multiple required>
+                        <option value="mon">Monday</option><option value="tue">Tuesday</option>
+                        <option value="wed">Wednesday</option><option value="thu">Thursday</option>
+                        <option value="fri">Friday</option><option value="sat">Saturday</option>
+                        <option value="sun">Sunday</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Time</label>
+                    <input type="time" name="schedule_time" required>
+                </div>
+                <div class="form-group">
+                    <label>Devices</label>
+                    <select name="schedule_devices_${counter}" multiple required>
+                        {% for device in devices %}
+                            <option value="{{ device.id }}">{{ device.solution }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="button" class="toggle-btn" style="background: var(--danger);" onclick="this.parentElement.remove()">Remove</button>
             `;
-
-            container.appendChild(scheduleDiv);
+            container.appendChild(div);
+            counter++;
         }
     </script>
 </head>
+
 <body>
-    <div class="w3-container w3-teal w3-center" style="position: relative;">
-        <div class="header-icon-left">
-            <i id="internet-status-icon" class="fas fa-spinner fa-spin" style="font-size: 24px;" title="Checking connection..."></i>
+    <header>
+        <div class="container" style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="width: 40px;"></div>
+            <h1>Schedules</h1>
+            <div style="width: 40px; text-align: right;">
+                <a href="{{ url_for('web.index') }}" style="color: var(--text-main);"><i class="fas fa-home"></i></a>
+            </div>
         </div>
-        <div class="header-icon-right">
-            <a href="/">
-                <i class="fas fa-home" style="font-size: 24px;"></i>
-            </a>
-        </div>
-        <h1>Schedule Configuration</h1>
-    </div>
-    <div class="w3-container w3-center w3-padding-16" >
-        
-        <h4>This page will allow you to configure scheduling for your switches.</h4>
-        
+    </header>
+
+    <main class="container">
         <form method="POST">
-            <div class="w3-flex w3-padding-16" style="flex-direction:row; gap:16px" id="schedules-container">
+            <div id="schedules-container" class="schedule-grid">
                 {% for schedule in schedules %}
-                <div class="w3-card w3-padding w3-sand" >
-                    <input type="hidden" name="schedule_id" value="{{ schedule.id }}" />
-                    <label>Name:</label>
-                    <input type="text" name="schedule_name" value="{{ schedule.name }}" class="w3-input w3-border w3-margin-bottom" required />
-                    <label>Action:</label>
-                    <select name="schedule_action" class="w3-select w3-border w3-margin-bottom" required>
-                        <option value="on" {% if schedule.action == 'on' %}selected{% endif %}>On</option>
-                        <option value="off" {% if schedule.action == 'off' %}selected{% endif %}>Off</option>
-                    </select>
-                    <label>Days:</label>
-                    <select name="schedule_days_{{ loop.index0 }}" multiple size="7" class="w3-select w3-border w3-margin-bottom">
-                        <option value="mon" {% if 'mon' in schedule.days %}selected{% endif %}>Monday</option>
-                        <option value="tue" {% if 'tue' in schedule.days %}selected{% endif %}>Tuesday</option>
-                        <option value="wed" {% if 'wed' in schedule.days %}selected{% endif %}>Wednesday</option>
-                        <option value="thu" {% if 'thu' in schedule.days %}selected{% endif %}>Thursday</option>
-                        <option value="fri" {% if 'fri' in schedule.days %}selected{% endif %}>Friday</option>
-                        <option value="sat" {% if 'sat' in schedule.days %}selected{% endif %}>Saturday</option>
-                        <option value="sun" {% if 'sun' in schedule.days %}selected{% endif %}>Sunday</option>
-                    </select>
-                    <label>Time (24h format HH:MM):</label>
-                    <input type="time" name="schedule_time" value="{{ schedule.time }}" class="w3-input w3-border w3-margin-bottom" required pattern="[0-9]{2}:[0-9]{2}" />
-                    <label>Switches:</label> 
-                    <select name="schedule_devices_{{ loop.index0 }}" multiple size="5" class="w3-select w3-border w3-margin-bottom" style="height: auto;">
-                        {% for device in devices %}
-                        <option value="{{ device.id }}"
-                            {% if device.id in schedule.devices %}
-                                selected
-                            {% endif %}>
-                            {{ device.solution }} 
-                        </option>
-                        {% endfor %}
-                    </select>
-                    <button type="button" class="w3-button w3-red" onclick="this.parentElement.remove()">Remove</button>
+                <div class="schedule-card">
+                    <input type="hidden" name="schedule_id" value="{{ schedule.id }}">
+                    <div class="form-group">
+                        <label>Schedule Name</label>
+                        <input type="text" name="schedule_name" value="{{ schedule.name }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Action</label>
+                        <select name="schedule_action" required>
+                            <option value="on" {% if schedule.action=='on' %}selected{% endif %}>Turn ON</option>
+                            <option value="off" {% if schedule.action=='off' %}selected{% endif %}>Turn OFF</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Days</label>
+                        <select name="schedule_days_{{ loop.index0 }}" multiple required>
+                            {% for code, day in [('mon','Monday'), ('tue','Tuesday'), ('wed','Wednesday'),
+                            ('thu','Thursday'), ('fri','Friday'), ('sat','Saturday'), ('sun','Sunday')] %}
+                            <option value="{{ code }}" {% if code in schedule.days %}selected{% endif %}>{{ day }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Time</label>
+                        <input type="time" name="schedule_time" value="{{ schedule.time }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Devices</label>
+                        <select name="schedule_devices_{{ loop.index0 }}" multiple required>
+                            {% for device in devices %}
+                            <option value="{{ device.id }}" {% if device.id in schedule.devices %}selected{% endif %}>{{
+                                device.solution }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="button" class="toggle-btn" style="background: var(--danger);"
+                        onclick="this.parentElement.remove()">Remove</button>
                 </div>
                 {% endfor %}
             </div>
-            <button type="button" class="w3-button w3-green" onclick="addSchedule()">Create</button>
-            <br/><br/>
-            
-            <button type="submit" class="w3-button w3-blue">Save Schedules</button>
+
+            <div style="display: flex; gap: 1rem; justify-content: center;">
+                <button type="button" class="toggle-btn"
+                    style="background: var(--success); width: auto; padding: 1rem 3rem;" onclick="addSchedule()">Add New
+                    Schedule</button>
+                <button type="submit" class="toggle-btn"
+                    style="background: var(--primary); color: var(--bg-dark); width: auto; padding: 1rem 3rem;">Save
+                    Schedules</button>
+            </div>
         </form>
-    </div>
+    </main>
 </body>
+
 </html>
