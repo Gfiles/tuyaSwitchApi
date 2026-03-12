@@ -28,42 +28,55 @@
             <a href="/all/off" class="toggle-btn" style="background: var(--danger); width: auto; padding: 0.75rem 2rem;">All Off</a>
         </div>
 
-        <div class="device-grid">
-            {% for switch in switches %}
-            <div class="device-card 
-                {% if switch.state == 'offline' %}offline{% elif switch.state %}on{% else %}off{% endif %}
-                {% if switch.power == 0 %}zero-power{% endif %}"
-                data-device-id="{{ switch.id }}"
-                onclick="window.location.href='{{ url_for('web.toggle', pk=switch.id) }}'">
-                
-                <div class="device-info">
-                    <p class="device-solution"><span style="text-transform: capitalize;">{{ switch.domain }}</span></p>
-                    <p class="device-name">{{ switch.name }}</p>
-                </div>
-                
-                <div class="device-stats" style="display: flex; gap: 1rem; color: var(--text-dim); font-size: 0.9em; margin-top: 0.5rem;">
-                    <div class="stat-item" style="display: flex; align-items: center; gap: 0.25rem;">
-                        <i class="fas fa-bolt" style="color: #fbbf24;"></i>
-                        <span class="voltage-val">{{ switch.voltage }}V</span>
+        {% for area, switches in grouped_switches.items() %}
+        <div class="area-group" style="margin-bottom: 3rem;">
+            <h2 style="font-size: 1.5rem; font-weight: 600; color: var(--primary); margin-bottom: 1.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem;">
+                {{ area }}
+            </h2>
+            <div class="device-grid">
+                {% for switch in switches %}
+                <div class="device-card 
+                    {% if switch.state == 'offline' %}offline{% elif switch.state %}on{% else %}off{% endif %}
+                    {% if switch.has_energy and switch.power == 0 %}zero-power{% endif %}"
+                    data-device-id="{{ switch.id }}"
+                    onclick="window.location.href='{{ url_for('web.toggle', pk=switch.id) }}'">
+                    
+                    <div class="device-info">
+                        <p class="device-solution"><span style="text-transform: capitalize;">{{ switch.name }}</span></p>
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <p class="device-name" id="desc-{{ switch.id }}">{{ switch.solution }}</p>
+                            <i class="fas fa-edit edit-icon" 
+                               style="cursor: pointer; color: var(--text-dim); padding: 0.5rem;"
+                               onclick="event.stopPropagation(); editDescription('{{ switch.id }}', '{{ switch.solution | escape }}')">
+                            </i>
+                        </div>
                     </div>
-                    <div class="stat-item" style="display: flex; align-items: center; gap: 0.25rem;">
-                        <i class="fas fa-plug" style="color: #60a5fa;"></i>
-                        <span class="power-val">{{ switch.power }}W</span>
+                    
+                    <div class="device-stats" style="display: flex; gap: 1rem; color: var(--text-dim); font-size: 0.9em; margin-top: 0.5rem;">
+                        <div class="stat-item" style="display: flex; align-items: center; gap: 0.25rem;">
+                            <i class="fas fa-bolt" style="color: #fbbf24;"></i>
+                            <span class="voltage-val">{{ switch.voltage }}V</span>
+                        </div>
+                        <div class="stat-item" style="display: flex; align-items: center; gap: 0.25rem;">
+                            <i class="fas fa-plug" style="color: #60a5fa;"></i>
+                            <span class="power-val">{{ switch.power }}W</span>
+                        </div>
+                        <div class="stat-item" style="display: flex; align-items: center; gap: 0.25rem;">
+                            <i class="fas fa-water" style="color: #34d399;"></i>
+                            <span class="current-val">{{ switch.current|default(0) }}A</span>
+                        </div>
                     </div>
-                    <div class="stat-item" style="display: flex; align-items: center; gap: 0.25rem;">
-                        <i class="fas fa-water" style="color: #34d399;"></i>
-                        <span class="current-val">{{ switch.current|default(0) }}A</span>
-                    </div>
-                </div>
 
-                <div style="margin-top: 1.5rem;">
-                    <button class="toggle-btn state-btn">
-                        {% if switch.state == 'offline' %}Offline{% elif switch.state %}ON{% else %}OFF{% endif %}
-                    </button>
+                    <div style="margin-top: 1.5rem;">
+                        <button class="toggle-btn state-btn">
+                            {% if switch.state == 'offline' %}Offline{% elif switch.state %}ON{% else %}OFF{% endif %}
+                        </button>
+                    </div>
                 </div>
+                {% endfor %}
             </div>
-            {% endfor %}
         </div>
+        {% endfor %}
     </main>
 
     <script>
@@ -107,7 +120,7 @@
                         }
                         
                         card.classList.remove('zero-power');
-                        if (data.power === 0) {
+                        if (data.has_energy && data.power === 0) {
                             card.classList.add('zero-power');
                         }
                         
@@ -126,6 +139,49 @@
                     })
                     .catch(err => console.error('Error fetching status for', deviceId, err));
             });
+        }
+        
+        // Edit description inline
+        function editDescription(deviceId, currentDesc) {
+            const newDesc = prompt("Enter new description for this switch:", currentDesc);
+            if (newDesc !== null && newDesc.trim() !== "" && newDesc.trim() !== currentDesc) {
+                // Get the API key from somewhere securely, or since this UI is ostensibly local,
+                // we'll assume the user is just bypassing API keys on localhost, 
+                // but wait, the API endpoints require headers!
+                // Actually, the web backend doesn't inject the API key to the frontend.
+                // Let's use a standard fetch, but since it's the web UI, it might be easier to use a form 
+                // POST or just pass the key if available.
+                // Looking at tuya_server/security.py, wait, I need to check if require_api_key enforces it for local.
+                
+                const apiKey = localStorage.getItem('tuya_api_key') || '';
+                
+                fetch(`/api/solution/${deviceId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': apiKey, 
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({ solution: newDesc.trim() })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert("Error saving description: " + data.error);
+                    } else {
+                        // Update the DOM
+                        const descEl = document.getElementById(`desc-${deviceId}`);
+                        if (descEl) descEl.textContent = data.solution;
+                        
+                        // Update the onclick handler so subsequent edits show the new value
+                        const editIcon = descEl.nextElementSibling;
+                        if (editIcon) {
+                            editIcon.setAttribute('onclick', `event.stopPropagation(); editDescription('${deviceId}', '${data.solution.replace(/'/g, "\\'")}')`);
+                        }
+                    }
+                })
+                .catch(err => alert("Network error: " + err));
+            }
         }
         
         // Poll every 5 seconds

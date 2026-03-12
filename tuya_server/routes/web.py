@@ -17,11 +17,19 @@ def index():
         device['voltage'] = status['voltage']
         device['power'] = status['power']
         device['current'] = status.get('current', 0)
+        device['has_energy'] = status.get('has_energy', False)
         
     title = db.get_settings().get('title', 'Tuya App')
     min_width = db.get_settings().get('minButtonWidth', 300)
     
-    return render_template("index.html", switches=devices, title=title, minButtonWidth=min_width)
+    grouped = {}
+    for dev in devices:
+        area = dev.get('area') or 'Ungrouped'
+        if area not in grouped:
+            grouped[area] = []
+        grouped[area].append(dev)
+    
+    return render_template("index.html", grouped_switches=grouped, title=title, minButtonWidth=min_width)
 
 @web_bp.route("/toggle/<pk>")
 def toggle(pk):

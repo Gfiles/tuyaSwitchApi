@@ -37,9 +37,14 @@ class TuyaDatabase:
                     id TEXT PRIMARY KEY,
                     name TEXT,
                     solution TEXT,
-                    domain TEXT
+                    domain TEXT,
+                    area TEXT
                 )
             ''')
+            # Check if area column exists, add if not
+            columns = [info['name'] for info in cursor.execute('PRAGMA table_info(devices)').fetchall()]
+            if 'area' not in columns:
+                cursor.execute('ALTER TABLE devices ADD COLUMN area TEXT')
             # Excluded devices table
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS excluded_devices (
@@ -88,8 +93,10 @@ class TuyaDatabase:
 
     def get_devices(self):
         with self.get_connection() as conn:
-            rows = conn.execute('SELECT * FROM devices ORDER BY solution COLLATE NOCASE').fetchall()
-            return [dict(row) for row in rows]
+            rows = conn.execute('SELECT * FROM devices ORDER BY area COLLATE NOCASE, solution COLLATE NOCASE').fetchall()
+            devices = [dict(row) for row in rows]
+            # Filter out child lock devices based on name or ID
+            return [d for d in devices if 'child lock' not in d.get('name', '').lower() and 'child_lock' not in d.get('id', '').lower()]
 
     def update_device_solution(self, device_id, solution):
         with self.get_connection() as conn:
@@ -145,7 +152,9 @@ class TuyaDatabase:
         with self.get_connection() as conn:
             for _, dev in scanned_devices.items():
                 if dev.get('id'):
-                    conn.execute('INSERT OR IGNORE INTO devices (id, name, solution, domain) VALUES (?, ?, ?, ?)',
-                                (dev['id'], dev['name'], dev['name'], dev['domain']))
-                    conn.execute('UPDATE devices SET name = ?, domain = ? WHERE id = ?', (dev['name'], dev['domain'], dev['id']))
+                    area_val = dev.get('area', '')
+                    conn.execute('INSERT OR IGNORE INTO devices (id, name, solution, domain, area) VALUES (?, ?, ?, ?, ?)',
+                                (dev['id'], dev['name'], dev['name'], dev['domain'], area_val))
+                    conn.execute('UPDATE devices SET name = ?, domain = ?, area = ? WHERE id = ?', 
+                                (dev['name'], dev['domain'], area_val, dev['id']))
             conn.commit()

@@ -34,6 +34,10 @@ class HomeAssistantClient:
             power = attributes.get('current_consumption', attributes.get('power', 0))
             current = attributes.get('current', 0)
             
+            # Use has_energy to track if we found ANY energy-related entities
+            # We check the main entity attributes first
+            has_energy = any(k in attributes for k in ('voltage', 'current_consumption', 'power', 'current'))
+            
             # For Tuya devices, these metrics are usually split into separate `sensor` entities
             # e.g. switch.yd_switch_1 -> sensor.yd_switch_1_voltage
             # For multi-relay switches like switch.tz3000_..._2, it usually maps to sensor.tz3000_..._voltage_2
@@ -55,11 +59,13 @@ class HomeAssistantClient:
                 
                 # Helper function to fetch a related sensor value
                 def fetch_sensor(suffix):
+                    nonlocal has_energy
                     try:
                         suffix_part = sensor_suffix_format.format(suffix=suffix, index=index)
                         sensor_url = self._get_api_url(f"/states/sensor.{base_without_index}_{suffix_part}")
                         res = requests.get(sensor_url, headers=self.headers, timeout=2)
                         if res.status_code == 200:
+                            has_energy = True
                             return float(res.json().get('state', 0))
                     except Exception as e:
                         logging.debug(f"Failed to fetch sensor {suffix} for {entity_id}: {e}")
@@ -82,6 +88,7 @@ class HomeAssistantClient:
                 "voltage": voltage,
                 "power": power,
                 "current": current,
+                "has_energy": has_energy,
                 "online": state_data.get('state') not in ['unavailable', 'unknown']
             }
         except Exception as e:
@@ -94,6 +101,7 @@ class HomeAssistantClient:
             "voltage": 0,
             "power": 0,
             "current": 0,
+            "has_energy": False,
             "online": False
         }
 
@@ -147,8 +155,28 @@ class HomeAssistantClient:
                         scanned[entity_id] = {
                             'id': entity_id,
                             'name': friendly_name,
-                            'domain': domain
+                            'domain': domain,
+                            'area': ''
                         }
+            
+            # Now fetch Area logic mapping in bulk
+            if scanned:
+                try:
+                    tpl_ids = str([eid for eid in scanned.keys()])
+                    template = "{% for e in " + tpl_ids + " %}{{ e }}:::{{ area_name(e) }}|{% endfor %}"
+                    
+                    tpl_url = self._get_api_url("/template")
+                    tpl_res = requests.post(tpl_url, headers=self.headers, json={'template': template}, timeout=5)
+                    if tpl_res.status_code == 200:
+                        lines = tpl_res.text.split('|')
+                        for line in lines:
+                            if ':::' in line:
+                                eid, area = line.split(':::', 1)
+                                if eid in scanned and area.strip() not in ('None', ''):
+                                    scanned[eid]['area'] = area.strip()
+                except Exception as e:
+                    logging.error(f"Error fetching areas: {e}")
+                    
             return scanned
         except Exception as e:
             logging.error(f"Error scanning Home Assistant entities: {e}")
